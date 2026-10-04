@@ -1,0 +1,17 @@
+{
+  "name": "소망 도서관",
+  "short_name": "소망 도서관",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#FBF8F1",
+  "theme_color": "#2F5D50",
+  "description": "베를린 소망교회 교인들의 책 나눔 도서관",
+  "orientation": "portrait-primary",
+  "prefer_related_applications": false,
+  "icons": [
+    { "src": "icons/Icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/Icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/Icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/Icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
