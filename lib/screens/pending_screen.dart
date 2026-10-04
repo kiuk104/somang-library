@@ -67,7 +67,10 @@ class _PendingScreenState extends State<PendingScreen> {
             const SizedBox(height: 10),
             Text(
               '도서관 담당자가 승인하면 바로 쓸 수 있어요.\n'
-              '초대 코드를 받았다면 아래에 입력해 주세요.',
+              '청소년부 선생님이나 도서관 담당자에게\n'
+              '초대 코드를 받았다면 아래에 입력해 주세요.\n\n'
+              '겨자씨 앱 계정이 있다면 로그아웃 후\n'
+              '그 이메일·비밀번호로 로그인하세요.',
               textAlign: TextAlign.center,
               style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
             ),
