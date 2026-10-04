@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../models/library_user.dart';
 import 'profile_tab.dart';
+import 'books/shelf_tab.dart';
+import 'books/my_books_tab.dart';
 
 /// 도서관 메인 — 아래 탭 4개
-/// 서가·내 책·대여는 다음 단계에서 채운다.
+/// 대여 탭은 다음 단계에서 채운다.
 class HomeShell extends StatefulWidget {
   final LibraryUser me;
   const HomeShell({super.key, required this.me});
@@ -19,16 +21,8 @@ class _HomeShellState extends State<HomeShell> {
   @override
   Widget build(BuildContext context) {
     final pages = <Widget>[
-      const _ComingSoon(
-        icon: Icons.local_library_outlined,
-        title: '서가',
-        description: '교인들이 등록한 책을 둘러보고\n대여 가능한 책을 신청해요.',
-      ),
-      const _ComingSoon(
-        icon: Icons.auto_stories_outlined,
-        title: '내 책',
-        description: '내가 가진 책을 등록해요.\nISBN 바코드를 찍으면 제목·표지가 자동으로 채워져요.',
-      ),
+      ShelfTab(me: widget.me),
+      MyBooksTab(me: widget.me),
       const _ComingSoon(
         icon: Icons.swap_horiz_rounded,
         title: '대여',

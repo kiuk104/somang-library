@@ -25,6 +25,13 @@
 - 초대: `createLibraryInvite` / `redeemInvite` (callable, `europe-west1`)
 - 초대 링크 형식: `https://somang-library.web.app/?invite=CODE`
 
+## 책 (books)
+- 필드: ownerId, ownerName(복사), title, author, publisher, isbn, coverUrl, note, status, createdAt, updatedAt
+- 문자열 필드는 null 금지(빈 문자열) — 규칙 `isValidBook`
+- status: `available`·`hidden` 은 소장자가, `requested`·`lent` 는 대여 함수가 바꾼다 (진행 중엔 소장자 수정·삭제 불가)
+- 책 정보 검색: `BookLookupService` (Google Books → Open Library), 바코드: `mobile_scanner` (웹은 https/localhost 에서만 카메라)
+- 표지 이미지: `BookCover` — `cacheWidth` + `WebHtmlElementStrategy.fallback`(CORS 없는 표지 서버 대응)
+
 ## 화면 흐름
 `AuthGate` → 로그인 안 함: `LoginScreen` / users 문서 없음: `JoinScreen` / 미승인 교인: `PendingScreen` / 그 외: `HomeShell`
 로그인·가입 후 화면 이동은 AuthGate 가 스트림으로 처리한다 (각 화면에서 Navigator 로 넘기지 않음).
