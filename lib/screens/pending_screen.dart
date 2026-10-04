@@ -67,10 +67,8 @@ class _PendingScreenState extends State<PendingScreen> {
             const SizedBox(height: 10),
             Text(
               '도서관 담당자가 승인하면 바로 쓸 수 있어요.\n'
-              '청소년부 선생님이나 도서관 담당자에게\n'
-              '초대 코드를 받았다면 아래에 입력해 주세요.\n\n'
-              '겨자씨 앱 계정이 있다면 로그아웃 후\n'
-              '그 이메일·비밀번호로 로그인하세요.',
+              '더 빨리 쓰려면 청소년부 선생님이나 도서관 담당자에게\n'
+              '초대 코드를 요청해서 아래에 입력하세요.',
               textAlign: TextAlign.center,
               style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
             ),
@@ -99,6 +97,29 @@ class _PendingScreenState extends State<PendingScreen> {
             TextButton(
               onPressed: _busy ? null : AuthService.signOut,
               child: const Text('로그아웃'),
+            ),
+            const SizedBox(height: 24),
+            // 겨자씨 계정이 있는데 다른 계정(예: 다른 Google 계정)으로 들어온 경우 안내
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.info_outline,
+                        size: 20, color: theme.colorScheme.primary),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        '청소년부(겨자씨 앱) 계정이 있다면 로그아웃한 뒤 '
+                        '겨자씨에서 쓰는 이메일·비밀번호로 로그인하세요. '
+                        '승인 없이 바로 쓸 수 있어요.',
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ],
         ),
