@@ -56,6 +56,9 @@
 - 이미지 업로드는 압축 후, 네트워크 이미지는 `cacheWidth` 지정 (iOS Safari 메모리)
 - 본문은 `PageFrame` (가운데 maxWidth 560)
 
+## 인수인계
+새 세션은 `doc/HANDOFF.md` 부터 읽는다 (진행 상황·남은 일·다음 기능 후보).
+
 ## 실행 / 배포
 ```powershell
 flutter pub get
