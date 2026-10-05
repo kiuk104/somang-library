@@ -5,6 +5,7 @@ import '../services/auth_service.dart';
 import '../widgets/page_frame.dart';
 import '../widgets/push_card.dart';
 import 'admin/invite_screen.dart';
+import 'admin/admin_loans_screen.dart';
 import 'admin/approval_screen.dart';
 import 'admin/librarian_screen.dart';
 import 'friends/friends_screen.dart';
@@ -79,6 +80,17 @@ class ProfileTab extends StatelessWidget {
                       onTap: () => Navigator.of(context).push(
                         MaterialPageRoute(
                             builder: (_) => ApprovalScreen(me: me)),
+                      ),
+                    ),
+                    const Divider(height: 1),
+                    ListTile(
+                      leading: const Icon(Icons.fact_check_outlined),
+                      title: const Text('전체 대여 현황'),
+                      subtitle: const Text('진행 중인 대여와 반납일이 지난 책'),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                            builder: (_) => const AdminLoansScreen()),
                       ),
                     ),
                     // 담당자 지정·해제는 규칙상 스태프만 가능
