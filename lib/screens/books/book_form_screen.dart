@@ -61,6 +61,23 @@ class _BookFormScreenState extends State<BookFormScreen> {
     super.dispose();
   }
 
+  /// 실시간 바코드 스캔 (web/scanner.js) — 찾으면 바로 검색
+  Future<void> _scanLive() async {
+    if (_searching) return;
+    String? isbn;
+    try {
+      isbn = await PhotoBarcode.scanLive();
+    } catch (e) {
+      if (mounted) showSnack(context, '스캔을 시작하지 못했어요. ($e)');
+      return;
+    }
+    if (isbn == null || !mounted) return;
+    final clean = BookLookupService.findIsbnInScan(isbn);
+    if (clean == null) return;
+    _queryCtrl.text = clean;
+    await _search();
+  }
+
   /// 바코드 사진 찍기 — 폰 기본 카메라(자동초점)로 찍고 zxing-wasm 으로 ISBN 을 읽는다
   /// (한국 책의 5자리 부가기호가 같이 찍혀도 978/979 13자리만 골라낸다)
   Future<void> _scan() async {
@@ -199,13 +216,19 @@ class _BookFormScreenState extends State<BookFormScreen> {
             if (!_isEdit) ...[
               // ── 찾기
               FilledButton.icon(
+                onPressed: _scanLive,
+                icon: const Icon(Icons.qr_code_scanner),
+                label: const Text('바코드 스캔'),
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
                 onPressed: _scan,
                 icon: const Icon(Icons.photo_camera_outlined),
-                label: const Text('바코드 사진 찍어서 찾기'),
+                label: const Text('사진으로 찍어서 찾기'),
               ),
               const SizedBox(height: 6),
               Text(
-                '책 뒷면 바코드를 가까이서 선명하게 찍어 주세요. 안 되면 아래에 ISBN 숫자를 입력해도 돼요.',
+                '스캔이 잘 안 되면 사진으로 찍거나, 아래에 ISBN 숫자를 입력해도 돼요.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                     fontSize: 12, color: Theme.of(context).colorScheme.outline),

@@ -30,8 +30,10 @@
 - 문자열 필드는 null 금지(빈 문자열) — 규칙 `isValidBook`
 - status: `available`·`hidden` 은 소장자가, `requested`·`lent` 는 대여 함수가 바꾼다 (진행 중엔 소장자 수정·삭제 불가)
 - 책 정보 검색: `BookLookupService` (카카오 lookupBook 함수 → Google Books → Open Library)
-- 바코드: 폰 기본 카메라 사진(`image_picker`) → `web/zxing`(zxing-wasm, 자체 호스팅) — `web/index.html` 의 `somangReadBarcodes`.
-  브라우저 실시간 카메라·내장 BarcodeDetector 는 갤럭시에서 인식 실패해서 쓰지 않는다
+- 바코드: `web/scanner.js` (zxing-wasm, `web/zxing` 자체 호스팅) — Dart 는 `PhotoBarcode`
+  - 실시간 `somangScanLive()`: 후면 메인 카메라(`camera2 0`) 선택 + 연속 자동초점 + 1080p, 가운데 띠를 잘라 인식
+  - 사진 `somangReadBarcodes(blob)`: `image_picker` 로 찍은 사진
+  - 브라우저 내장 BarcodeDetector·mobile_scanner 는 갤럭시에서 인식 실패해서 쓰지 않는다
 - 표지 이미지: `BookCover` — `cacheWidth` + `WebHtmlElementStrategy.fallback`(CORS 없는 표지 서버 대응)
 
 ## 화면 흐름
