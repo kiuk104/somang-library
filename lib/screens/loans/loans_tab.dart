@@ -112,11 +112,15 @@ class _LoansTabState extends State<LoansTab> {
         done: '반납 완료! 책이 다시 서가에 올라갔어요.');
   }
 
-  Future<void> _changeReturnPlace(Loan l) async {
-    final place = await showReturnPlaceDialog(context, l);
-    if (place == null) return;
-    await _run(l, () => LoanService.setReturnPlace(l.id, place),
-        done: '반납 장소를 바꿨어요. 상대방에게 알려 드렸어요.');
+  Future<void> _reschedule(Loan l) async {
+    final fields = await showScheduleDialog(context, l);
+    if (fields == null) return;
+    if (fields.isEmpty) {
+      if (mounted) showSnack(context, '바뀐 내용이 없어요.');
+      return;
+    }
+    await _run(l, () => LoanService.reschedule(l.id, fields),
+        done: '일정을 바꿨어요. 상대방에게 알려 드렸어요.');
   }
 
   @override
@@ -194,13 +198,15 @@ class _LoansTabState extends State<LoansTab> {
               mine(l)
                   ? '${l.borrowerName}님에게 건네주기'
                   : '${l.ownerName}님에게 받기',
-              '📅 ${Loan.koSunday(l.handoverDate)} · 📍 ${l.handoverPlace}',
+              '📅 ${Loan.koWhen(l.handoverDate, l.handoverTime)}',
+              '📍 ${l.handoverPlace}',
               if (l.returnPlace.isNotEmpty && l.returnPlace != l.handoverPlace)
                 '반납은 ${l.returnPlace}',
             ],
             busy: _busy.contains(l.id),
             actions: [
               _Act('취소', () => _cancel(l)),
+              _Act('일정 변경', () => _reschedule(l)),
               _Act('주고받았어요', () => _handover(l), primary: true),
             ],
           ),
@@ -223,11 +229,11 @@ class _LoansTabState extends State<LoansTab> {
             warn: l.isOverdue,
             lines: [
               '${l.ownerName}님의 책',
-              '${l.isOverdue ? '⚠️ 반납일 지남' : '반납일'}: ${Loan.koSunday(l.dueDate)}',
+              '${l.isOverdue ? '⚠️ 반납일 지남' : '반납일'}: ${Loan.koWhen(l.dueDate, l.returnTime)}',
               '📍 반납 장소: ${l.returnPlace.isEmpty ? '정해지지 않음' : l.returnPlace}',
             ],
             busy: _busy.contains(l.id),
-            actions: [_Act('반납 장소 바꾸기', () => _changeReturnPlace(l))],
+            actions: [_Act('반납 일정·장소 변경', () => _reschedule(l))],
           ),
       ],
       if (lentOut.isNotEmpty) ...[
@@ -238,12 +244,12 @@ class _LoansTabState extends State<LoansTab> {
             warn: l.isOverdue,
             lines: [
               '${l.borrowerName}님이 읽는 중',
-              '${l.isOverdue ? '⚠️ 반납일 지남' : '반납일'}: ${Loan.koSunday(l.dueDate)}',
+              '${l.isOverdue ? '⚠️ 반납일 지남' : '반납일'}: ${Loan.koWhen(l.dueDate, l.returnTime)}',
               '📍 반납 장소: ${l.returnPlace.isEmpty ? '정해지지 않음' : l.returnPlace}',
             ],
             busy: _busy.contains(l.id),
             actions: [
-              _Act('장소 바꾸기', () => _changeReturnPlace(l)),
+              _Act('일정 변경', () => _reschedule(l)),
               _Act('돌려받았어요', () => _return(l), primary: true),
             ],
           ),

@@ -45,6 +45,12 @@ class LoanService {
   static Future<void> returnBook(String loanId) =>
       _call({'action': 'return', 'loanId': loanId});
 
+  /// 일정·장소 변경 — 보낸 항목만 바뀐다
+  /// 수락 후: handoverDate, handoverTime, handoverPlace, returnPlace
+  /// 대여 중: dueDate, returnTime, returnPlace
+  static Future<void> reschedule(String loanId, Map<String, String> fields) =>
+      _call({'action': 'reschedule', 'loanId': loanId, ...fields});
+
   static Future<void> setReturnPlace(String loanId, String place) =>
       _call({'action': 'setReturnPlace', 'loanId': loanId, 'returnPlace': place});
 

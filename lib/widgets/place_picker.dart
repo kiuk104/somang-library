@@ -254,3 +254,125 @@ Future<String?> showReturnPlaceDialog(BuildContext context, Loan loan) {
     ),
   );
 }
+
+/// 일정·장소 변경 창
+/// - 수락 후(주고받기 전): 전달 날짜·시간·장소 + 반납 장소
+/// - 대여 중: 반납 날짜·시간·장소
+/// 바꾼 항목만 담은 Map 을 돌려준다 (닫으면 null)
+Future<Map<String, String>?> showScheduleDialog(
+    BuildContext context, Loan loan) {
+  final lent = loan.status == LoanStatus.lent;
+  var date = DateTime.tryParse(lent ? loan.dueDate : loan.handoverDate) ??
+      DateTime.now();
+  final timeCtrl =
+      TextEditingController(text: lent ? loan.returnTime : loan.handoverTime);
+  var place = lent ? loan.returnPlace : loan.handoverPlace;
+  var returnPlace = loan.returnPlace;
+
+  return showDialog<Map<String, String>>(
+    context: context,
+    builder: (ctx) => StatefulBuilder(
+      builder: (ctx, setLocal) {
+        final theme = Theme.of(ctx);
+        final today = DateTime.now();
+        return AlertDialog(
+          title: Text(lent ? '반납 일정 바꾸기' : '주고받기 일정 바꾸기'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(lent ? '반납 날짜' : '주고받는 날짜',
+                    style: theme.textTheme.labelLarge),
+                const SizedBox(height: 6),
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.event),
+                  label: Text(Loan.koDate(Loan.ymdOf(date))),
+                  onPressed: () async {
+                    final picked = await showDatePicker(
+                      context: ctx,
+                      initialDate: date.isBefore(today) ? today : date,
+                      firstDate: DateTime(today.year, today.month, today.day),
+                      lastDate: today.add(Duration(days: lent ? 180 : 60)),
+                      helpText: '주일이 아니어도 괜찮아요',
+                    );
+                    if (picked != null) setLocal(() => date = picked);
+                  },
+                ),
+                const SizedBox(height: 14),
+                Text('시간 (선택)', style: theme.textTheme.labelLarge),
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    for (final t in const ['예배 전', '예배 후'])
+                      ActionChip(
+                        label: Text(t),
+                        onPressed: () => setLocal(() => timeCtrl.text = t),
+                      ),
+                  ],
+                ),
+                TextField(
+                  controller: timeCtrl,
+                  maxLength: 30,
+                  decoration: const InputDecoration(
+                    hintText: '예: 12:30, 점심 후',
+                    counterText: '',
+                  ),
+                ),
+                const SizedBox(height: 14),
+                PlacePicker(
+                  label: lent ? '돌려줄 곳' : '주고받을 곳',
+                  initial: place,
+                  onChanged: (v) => place = v,
+                ),
+                if (!lent) ...[
+                  const SizedBox(height: 14),
+                  PlacePicker(
+                    label: '나중에 반납할 곳',
+                    initial: loan.returnPlace,
+                    onChanged: (v) => returnPlace = v,
+                  ),
+                ],
+                const SizedBox(height: 8),
+                Text('바꾸면 상대방에게 알림이 가요.',
+                    style: TextStyle(fontSize: 12, color: theme.colorScheme.outline)),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx), child: const Text('닫기')),
+            FilledButton(
+              onPressed: () {
+                if (place.isEmpty || (!lent && returnPlace.isEmpty)) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                      content: Text('장소를 골라 주세요. (직접 입력은 내용을 적어 주세요)')));
+                  return;
+                }
+                final ymd = Loan.ymdOf(date);
+                final time = timeCtrl.text.trim();
+                final out = <String, String>{};
+                if (lent) {
+                  if (ymd != loan.dueDate) out['dueDate'] = ymd;
+                  if (time != loan.returnTime) out['returnTime'] = time;
+                  if (place != loan.returnPlace) out['returnPlace'] = place;
+                } else {
+                  if (ymd != loan.handoverDate) out['handoverDate'] = ymd;
+                  if (time != loan.handoverTime) out['handoverTime'] = time;
+                  if (place != loan.handoverPlace) out['handoverPlace'] = place;
+                  if (returnPlace != loan.returnPlace) {
+                    out['returnPlace'] = returnPlace;
+                  }
+                }
+                Navigator.pop(ctx, out);
+              },
+              child: const Text('바꾸기'),
+            ),
+          ],
+        );
+      },
+    ),
+  );
+}
+

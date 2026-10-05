@@ -51,6 +51,8 @@ class Loan {
   final String message;
   final String handoverPlace;
   final String returnPlace;
+  final String handoverTime; // 선택: '예배 후', '12:30' 등
+  final String returnTime;
   final String handoverDate; // 'YYYY-MM-DD' (주일)
   final String dueDate; // 'YYYY-MM-DD' (주일)
   final DateTime? requestedAt;
@@ -69,6 +71,8 @@ class Loan {
     required this.message,
     required this.handoverPlace,
     required this.returnPlace,
+    this.handoverTime = '',
+    this.returnTime = '',
     required this.handoverDate,
     required this.dueDate,
     this.requestedAt,
@@ -94,12 +98,21 @@ class Loan {
         '${n.month.toString().padLeft(2, '0')}-${n.day.toString().padLeft(2, '0')}';
   }
 
-  /// '2026-10-11' → '10월 11일 주일'
-  static String koSunday(String ymd) {
-    final p = ymd.split('-');
-    if (p.length != 3) return ymd;
-    return '${int.parse(p[1])}월 ${int.parse(p[2])}일 주일';
+  /// '2026-10-11' → '10월 11일 주일', '2026-10-14' → '10월 14일(수)'
+  static String koDate(String ymd) {
+    final d = DateTime.tryParse(ymd);
+    if (d == null) return ymd;
+    if (d.weekday == DateTime.sunday) return '${d.month}월 ${d.day}일 주일';
+    const names = ['월', '화', '수', '목', '금', '토', '일'];
+    return '${d.month}월 ${d.day}일(${names[d.weekday - 1]})';
   }
+
+  /// 날짜 + 시간 ('10월 11일 주일 · 예배 후')
+  static String koWhen(String ymd, String time) =>
+      time.isEmpty ? koDate(ymd) : '${koDate(ymd)} · $time';
+
+  static String ymdOf(DateTime d) =>
+      '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
   factory Loan.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     final d = doc.data() ?? const {};
@@ -118,6 +131,8 @@ class Loan {
       message: s('message'),
       handoverPlace: s('handoverPlace'),
       returnPlace: s('returnPlace'),
+      handoverTime: s('handoverTime'),
+      returnTime: s('returnTime'),
       handoverDate: s('handoverDate'),
       dueDate: s('dueDate'),
       requestedAt: t('requestedAt'),
