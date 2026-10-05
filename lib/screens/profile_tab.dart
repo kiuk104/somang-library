@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 
 import '../models/library_user.dart';
+import '../services/account_service.dart';
 import '../services/auth_service.dart';
 import '../widgets/page_frame.dart';
 import '../widgets/push_card.dart';
+import '../widgets/rename_dialog.dart';
 import 'admin/invite_screen.dart';
 import 'admin/admin_loans_screen.dart';
 import 'admin/approval_screen.dart';
 import 'admin/librarian_screen.dart';
+import 'admin/members_screen.dart';
 import 'friends/friends_screen.dart';
 import 'help_screen.dart';
 
@@ -15,6 +18,17 @@ import 'help_screen.dart';
 class ProfileTab extends StatelessWidget {
   final LibraryUser me;
   const ProfileTab({super.key, required this.me});
+
+  Future<void> _renameMe(BuildContext context) async {
+    final name = await showRenameDialog(context, current: me.name);
+    if (name == null || !context.mounted) return;
+    try {
+      await AccountService.rename(name);
+      if (context.mounted) showSnack(context, '이름을 "$name"(으)로 바꿨어요.');
+    } catch (e) {
+      if (context.mounted) showSnack(context, AccountService.messageFor(e));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -45,6 +59,14 @@ class ProfileTab extends StatelessWidget {
                   if (me.isLibrarian) '도서관 담당',
                   if (me.email.isNotEmpty) me.email,
                 ].join(' · ')),
+                // 교인 계정만 도서관에서 이름을 고친다 (청소년부 이름은 겨자씨 앱에서)
+                trailing: me.isMember
+                    ? IconButton(
+                        tooltip: '이름 수정',
+                        icon: const Icon(Icons.edit_outlined),
+                        onPressed: () => _renameMe(context),
+                      )
+                    : null,
               ),
             ),
 
@@ -91,6 +113,17 @@ class ProfileTab extends StatelessWidget {
                       onTap: () => Navigator.of(context).push(
                         MaterialPageRoute(
                             builder: (_) => const AdminLoansScreen()),
+                      ),
+                    ),
+                    const Divider(height: 1),
+                    ListTile(
+                      leading: const Icon(Icons.badge_outlined),
+                      title: const Text('교인 이름 수정'),
+                      subtitle: const Text('잘못 입력한 교인 이름 고치기'),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                            builder: (_) => const MembersScreen()),
                       ),
                     ),
                     // 담당자 지정·해제는 규칙상 스태프만 가능

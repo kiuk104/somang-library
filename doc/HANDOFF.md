@@ -22,6 +22,7 @@
 - 겨자씨: 마이페이지 "소망 도서관" 바로가기, 교인 계정 진입 차단
 - 서가 보기 방식: 표지 작게(기본)·보통·크게·목록 (`ShelfView`, 앱을 다시 열면 기본값)
 - 도움말 화면 (`help_screen.dart`) — 서가 앱바 `?` 와 내 정보 탭에서 열림
+- 교인 이름 수정 — 본인(내 정보 연필)·관리자(`admin/members_screen.dart`). 함수 `renameLibraryUser` 가 users 와 복사본(books·loans·library_friendships)을 함께 바꿈. 교인(role member)만, 청소년부 이름은 겨자씨에서
 - 전체 대여 현황 (`admin/admin_loans_screen.dart`) — 반납 지난 건·진행 중·지난 기록, 검색. 규칙이 관리자 loans 읽기를 이미 허용해 클라이언트만 추가
 - 도서관 담당자 지정 (`admin/librarian_screen.dart`, 스태프만 — 규칙이 이미 허용해서 클라이언트에서 직접 씀)
 - 새 가입 대기 교인 → 담당자에게 알림·푸시 (`notifyLibraryJoinRequest`, 담당자가 없으면 스태프)
