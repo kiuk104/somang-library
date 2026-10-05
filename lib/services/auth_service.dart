@@ -1,5 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 
+import 'push_service.dart';
+
 /// 로그인 / 가입 / 로그아웃 — 계정은 겨자씨와 같다
 class AuthService {
   static FirebaseAuth get _auth => FirebaseAuth.instance;
@@ -30,7 +32,12 @@ class AuthService {
     return _auth.sendPasswordResetEmail(email: email.trim());
   }
 
-  static Future<void> signOut() => _auth.signOut();
+  /// 로그아웃 — 이 기기의 푸시 토큰을 먼저 지운다 (공용 기기 대비)
+  static Future<void> signOut() async {
+    final uid = _auth.currentUser?.uid;
+    if (uid != null) await PushService.forget(uid);
+    await _auth.signOut();
+  }
 
   static bool isCancelled(FirebaseAuthException e) =>
       e.code == 'popup-closed-by-user' || e.code == 'cancelled-popup-request';

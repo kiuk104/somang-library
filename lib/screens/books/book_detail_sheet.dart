@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../models/book.dart';
 import '../../models/library_user.dart';
 import '../../services/book_service.dart';
+import '../../services/loan_service.dart';
+import '../../widgets/place_picker.dart';
 import '../../widgets/book_cover.dart';
 import 'book_form_screen.dart';
 
@@ -55,6 +57,23 @@ class _BookDetailState extends State<_BookDetail> {
           next == BookStatus.available ? '다시 빌려줄 수 있게 했어요.' : '잠시 대여를 쉬어요.');
     } catch (e) {
       _closeWith(messenger, '바꾸지 못했어요. ($e)');
+    }
+  }
+
+  /// 대여 신청 (받고 싶은 곳 + 메모)
+  Future<void> _request() async {
+    if (_busy) return;
+    final input = await showRequestDialog(context, book.title);
+    if (input == null || !mounted) return;
+    setState(() => _busy = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await LoanService.request(book.id,
+          handoverPlace: input.place, message: input.message);
+      _closeWith(messenger,
+          '신청했어요! ${book.ownerName}님이 수락하면 알려 드릴게요. (대여 탭에서 확인)');
+    } catch (e) {
+      _closeWith(messenger, LoanService.messageFor(e));
     }
   }
 
@@ -176,16 +195,16 @@ class _BookDetailState extends State<_BookDetail> {
                     style: TextStyle(color: theme.colorScheme.error)),
               ),
             ] else
-              Text('대여가 진행 중이라 지금은 수정할 수 없어요.',
+              Text('대여가 진행 중이라 지금은 수정할 수 없어요.\n"대여" 탭에서 관리해 주세요.',
                   textAlign: TextAlign.center,
                   style: TextStyle(color: theme.colorScheme.outline)),
           ] else
             FilledButton.icon(
-              onPressed: null, // 다음 단계: 대여 신청 → 소장자 알림
+              onPressed: book.isAvailable && !_busy ? _request : null,
               icon: const Icon(Icons.send_outlined),
               label: Text(book.isAvailable
-                  ? '대여 신청 (곧 열려요)'
-                  : BookStatus.label(book.status)),
+                  ? '대여 신청'
+                  : '지금은 신청할 수 없어요 · ${BookStatus.label(book.status)}'),
             ),
         ],
       ),

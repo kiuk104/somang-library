@@ -3,11 +3,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 /// 책 상태
 /// - available : 대여 가능
 /// - hidden    : 소장자가 잠시 숨김 (서가에는 보이지만 신청 불가)
-/// - requested / lent : 대여 진행 (다음 단계 — Cloud Function 이 바꾼다)
+/// - requested / reserved / lent : 대여 진행 (loanAction 함수가 바꾼다)
 class BookStatus {
   static const available = 'available';
   static const hidden = 'hidden';
   static const requested = 'requested';
+  static const reserved = 'reserved'; // 수락됨, 주일 전달 예정
   static const lent = 'lent';
 
   static String label(String status) {
@@ -18,6 +19,8 @@ class BookStatus {
         return '대여 쉼';
       case requested:
         return '신청 중';
+      case reserved:
+        return '전달 예정';
       case lent:
         return '대여 중';
       default:

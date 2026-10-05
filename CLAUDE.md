@@ -36,6 +36,15 @@
   - 브라우저 내장 BarcodeDetector·mobile_scanner 는 갤럭시에서 인식 실패해서 쓰지 않는다
 - 표지 이미지: `BookCover` — `cacheWidth` + `WebHtmlElementStrategy.fallback`(CORS 없는 표지 서버 대응)
 
+## 대여 (loans)
+- 상태 변경은 전부 Cloud Function `loanAction` (mustardseed, europe-west1): request → accept(장소 확정) → handover → return, reject·cancel·setReturnPlace
+- 장소 선택지: `LoanPlaces.presets` (게마인데잘 / 대여 서재 / 대예배실 앞) + 직접 입력
+- 날짜는 'YYYY-MM-DD' 주일 문자열 (handoverDate, dueDate=4주 뒤 주일)
+- 대여 목록·알림함 구독은 `HomeShell` 한 곳에서 (탭 배지 공용)
+- 알림함 `library_notifications`, 웹 푸시 토큰 `users/{uid}/libraryTokens/{token}`
+- 웹 푸시: `PushService.vapidKey` (콘솔 웹 푸시 인증서 공개 키) 필요, `web/firebase-messaging-sw.js`
+  로그아웃 시 토큰 삭제 (`AuthService.signOut` → `PushService.forget`)
+
 ## 화면 흐름
 `AuthGate` → 로그인 안 함: `LoginScreen` / users 문서 없음: `JoinScreen` / 미승인 교인: `PendingScreen` / 그 외: `HomeShell`
 로그인·가입 후 화면 이동은 AuthGate 가 스트림으로 처리한다 (각 화면에서 Navigator 로 넘기지 않음).

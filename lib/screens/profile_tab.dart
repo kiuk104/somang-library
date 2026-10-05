@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/library_user.dart';
 import '../services/auth_service.dart';
 import '../widgets/page_frame.dart';
+import '../widgets/push_card.dart';
 import 'admin/invite_screen.dart';
 import 'admin/approval_screen.dart';
 
@@ -42,6 +43,9 @@ class ProfileTab extends StatelessWidget {
                 ].join(' · ')),
               ),
             ),
+
+            const SizedBox(height: 12),
+            const PushCard(),
 
             if (me.isLibraryAdmin) ...[
               const SizedBox(height: 24),
