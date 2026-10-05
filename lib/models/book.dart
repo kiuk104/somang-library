@@ -29,6 +29,12 @@ class BookStatus {
   }
 }
 
+/// 공개 범위 — public: 모든 도서관 사용자 / friends: 서로 친구인 사람만
+class BookVisibility {
+  static const public = 'public';
+  static const friends = 'friends';
+}
+
 /// books/{bookId}
 class Book {
   final String id;
@@ -41,6 +47,7 @@ class Book {
   final String coverUrl;
   final String note; // 소장자 메모 (책 상태 등)
   final String status;
+  final String visibility; // BookVisibility (없으면 public)
   final DateTime? createdAt;
 
   const Book({
@@ -54,10 +61,12 @@ class Book {
     this.coverUrl = '',
     this.note = '',
     this.status = BookStatus.available,
+    this.visibility = BookVisibility.public,
     this.createdAt,
   });
 
   bool get isAvailable => status == BookStatus.available;
+  bool get friendsOnly => visibility == BookVisibility.friends;
   bool get isOwnerEditable =>
       status == BookStatus.available || status == BookStatus.hidden;
 
@@ -79,6 +88,9 @@ class Book {
       coverUrl: s('coverUrl'),
       note: s('note'),
       status: d['status']?.toString() ?? BookStatus.available,
+      visibility: d['visibility']?.toString() == BookVisibility.friends
+          ? BookVisibility.friends
+          : BookVisibility.public,
       createdAt: created is Timestamp ? created.toDate() : null,
     );
   }
@@ -94,5 +106,6 @@ class Book {
         'coverUrl': coverUrl,
         'note': note,
         'status': status,
+        'visibility': visibility,
       };
 }

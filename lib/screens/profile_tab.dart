@@ -6,6 +6,9 @@ import '../widgets/page_frame.dart';
 import '../widgets/push_card.dart';
 import 'admin/invite_screen.dart';
 import 'admin/approval_screen.dart';
+import 'admin/librarian_screen.dart';
+import 'friends/friends_screen.dart';
+import 'help_screen.dart';
 
 /// 내 정보 + (관리자) 초대·승인 메뉴
 class ProfileTab extends StatelessWidget {
@@ -78,10 +81,52 @@ class ProfileTab extends StatelessWidget {
                             builder: (_) => ApprovalScreen(me: me)),
                       ),
                     ),
+                    // 담당자 지정·해제는 규칙상 스태프만 가능
+                    if (me.isStaff) ...[
+                      const Divider(height: 1),
+                      ListTile(
+                        leading: const Icon(Icons.manage_accounts_outlined),
+                        title: const Text('도서관 담당자 지정'),
+                        subtitle: const Text('승인된 교인 중에서 고르기'),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                              builder: (_) => LibrarianScreen(me: me)),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
             ],
+
+            const SizedBox(height: 24),
+            Card(
+              child: Column(
+                children: [
+                  ListTile(
+                    leading: const Icon(Icons.people_outline),
+                    title: const Text('친구'),
+                    subtitle: const Text('친구 찾기·신청·내 친구 목록'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                          builder: (_) => FriendsScreen(me: me)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Card(
+              child: ListTile(
+                leading: const Icon(Icons.help_outline),
+                title: const Text('도움말'),
+                subtitle: const Text('빌리기·빌려주기·책 등록 사용법'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => HelpScreen.open(context, me),
+              ),
+            ),
 
             const SizedBox(height: 32),
             OutlinedButton.icon(

@@ -1,13 +1,30 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../../models/book.dart';
+import '../../models/friendship.dart';
 import '../../models/library_user.dart';
 import '../../services/book_service.dart';
+import '../../services/friend_service.dart';
 import '../../widgets/book_cover.dart';
+import '../help_screen.dart';
 import 'book_detail_sheet.dart';
+
+/// 서가 보기 방식 — 격자 3단계(표지 크기) + 한 줄 목록
+enum ShelfView {
+  small('작게', 96, Icons.grid_view),
+  medium('보통', 120, Icons.apps),
+  large('크게', 150, Icons.crop_square),
+  list('목록', 0, Icons.view_list);
+
+  final String label;
+  final double maxExtent; // 격자 한 칸 최대 너비 (목록은 안 씀)
+  final IconData icon;
+  const ShelfView(this.label, this.maxExtent, this.icon);
+}
 
 /// 서가 — 교인들이 등록한 모든 책 (검색 + 대여 가능만 보기)
 class ShelfTab extends StatefulWidget {
@@ -24,10 +41,31 @@ class _ShelfTabState extends State<ShelfTab> {
   final _searchCtrl = TextEditingController();
   String _query = '';
   bool _onlyAvailable = false;
-  bool _listView = false; // false: 작은 표지 격자, true: 한 줄 목록
+  ShelfView _view = ShelfView.small;
+
+  // 내 친구 uid — '친구에게만 공개' 책은 소장자가 나이거나 친구일 때만 보인다
+  Set<String> _friendIds = {};
+  StreamSubscription<List<Friendship>>? _friendSub;
+
+  @override
+  void initState() {
+    super.initState();
+    _friendSub = FriendService.watchMine(widget.me.uid).listen(
+      (list) {
+        if (mounted) setState(() => _friendIds = FriendService.friendIds(list));
+      },
+      onError: (_) {}, // 못 읽으면 친구 없음으로 본다 (친구 공개 책만 숨겨짐)
+    );
+  }
+
+  bool _canSee(Book b) =>
+      !b.friendsOnly ||
+      b.ownerId == widget.me.uid ||
+      _friendIds.contains(b.ownerId);
 
   @override
   void dispose() {
+    _friendSub?.cancel();
     _searchCtrl.dispose();
     super.dispose();
   }
@@ -37,7 +75,16 @@ class _ShelfTabState extends State<ShelfTab> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('서가')),
+      appBar: AppBar(
+        title: const Text('서가'),
+        actions: [
+          IconButton(
+            tooltip: '도움말',
+            icon: const Icon(Icons.help_outline),
+            onPressed: () => HelpScreen.open(context, widget.me),
+          ),
+        ],
+      ),
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
         stream: _stream,
         builder: (context, snapshot) {
@@ -48,8 +95,8 @@ class _ShelfTabState extends State<ShelfTab> {
             return const Center(child: CircularProgressIndicator());
           }
 
-          final all =
-              BookService.sortNewest(snapshot.data!.docs.map(Book.fromDoc));
+          final all = BookService.sortNewest(
+              snapshot.data!.docs.map(Book.fromDoc).where(_canSee));
           final q = _query.trim().toLowerCase();
           final books = all.where((b) {
             if (_onlyAvailable && !b.isAvailable) return false;
@@ -100,26 +147,38 @@ class _ShelfTabState extends State<ShelfTab> {
                                   style: TextStyle(
                                       color: theme.colorScheme.outline)),
                               const SizedBox(width: 8),
-                              SegmentedButton<bool>(
-                                showSelectedIcon: false,
-                                style: const ButtonStyle(
-                                  visualDensity: VisualDensity.compact,
-                                  padding: WidgetStatePropertyAll(
-                                      EdgeInsets.symmetric(horizontal: 4)),
-                                ),
-                                segments: const [
-                                  ButtonSegment(
-                                      value: false,
-                                      icon: Icon(Icons.grid_view, size: 18),
-                                      tooltip: '표지로 보기'),
-                                  ButtonSegment(
-                                      value: true,
-                                      icon: Icon(Icons.view_list, size: 18),
-                                      tooltip: '목록으로 보기'),
+                              PopupMenuButton<ShelfView>(
+                                tooltip: '보기 방식',
+                                initialValue: _view,
+                                onSelected: (v) => setState(() => _view = v),
+                                itemBuilder: (_) => [
+                                  for (final v in ShelfView.values)
+                                    PopupMenuItem(
+                                      value: v,
+                                      child: Row(
+                                        children: [
+                                          Icon(v.icon, size: 20),
+                                          const SizedBox(width: 10),
+                                          Text(v == ShelfView.list
+                                              ? '목록'
+                                              : '표지 ${v.label}'),
+                                        ],
+                                      ),
+                                    ),
                                 ],
-                                selected: {_listView},
-                                onSelectionChanged: (v) =>
-                                    setState(() => _listView = v.first),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(6),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(_view.icon, size: 20),
+                                      const SizedBox(width: 4),
+                                      Text(_view.label,
+                                          style: const TextStyle(fontSize: 13)),
+                                      const Icon(Icons.arrow_drop_down),
+                                    ],
+                                  ),
+                                ),
                               ),
                             ],
                           ),
@@ -141,7 +200,7 @@ class _ShelfTabState extends State<ShelfTab> {
                         ),
                       ),
                     )
-                  else if (_listView)
+                  else if (_view == ShelfView.list)
                     SliverPadding(
                       padding: const EdgeInsets.fromLTRB(8, 0, 8, 32),
                       sliver: SliverList.separated(
@@ -159,8 +218,8 @@ class _ShelfTabState extends State<ShelfTab> {
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
                       sliver: SliverGrid(
                         gridDelegate:
-                            const SliverGridDelegateWithMaxCrossAxisExtent(
-                          maxCrossAxisExtent: 96, // 폰에서 4열
+                            SliverGridDelegateWithMaxCrossAxisExtent(
+                          maxCrossAxisExtent: _view.maxExtent, // 작게 96 / 보통 120 / 크게 150
                           mainAxisSpacing: 12,
                           crossAxisSpacing: 10,
                           childAspectRatio: 0.46, // 표지(1:1.5) + 제목 2줄 + 소장자

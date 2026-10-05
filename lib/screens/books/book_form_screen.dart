@@ -30,6 +30,7 @@ class _BookFormScreenState extends State<BookFormScreen> {
   late final TextEditingController _noteCtrl;
   late String _coverUrl;
   late bool _available;
+  late bool _friendsOnly;
 
   List<BookInfo>? _results; // null: 아직 검색 안 함
   bool _searching = false;
@@ -48,6 +49,7 @@ class _BookFormScreenState extends State<BookFormScreen> {
     _noteCtrl = TextEditingController(text: b?.note ?? '');
     _coverUrl = b?.coverUrl ?? '';
     _available = b == null || b.status == BookStatus.available;
+    _friendsOnly = b?.friendsOnly ?? false;
   }
 
   @override
@@ -181,6 +183,8 @@ class _BookFormScreenState extends State<BookFormScreen> {
       // 규칙은 500 '글자'(코드 포인트) 기준 — 이모지 등 대비해 한 번 더 자른다
       note: String.fromCharCodes(_noteCtrl.text.trim().runes.take(500)),
       status: _available ? BookStatus.available : BookStatus.hidden,
+      visibility:
+          _friendsOnly ? BookVisibility.friends : BookVisibility.public,
     );
     try {
       if (_isEdit) {
@@ -354,6 +358,15 @@ class _BookFormScreenState extends State<BookFormScreen> {
                   : '서가에 보이지만 지금은 신청을 받지 않아요'),
               value: _available,
               onChanged: (v) => setState(() => _available = v),
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('친구에게만 공개'),
+              subtitle: Text(_friendsOnly
+                  ? '서로 친구인 사람만 이 책을 보고 신청할 수 있어요'
+                  : '도서관 사용자 누구나 이 책을 볼 수 있어요'),
+              value: _friendsOnly,
+              onChanged: (v) => setState(() => _friendsOnly = v),
             ),
             const SizedBox(height: 16),
             FilledButton(

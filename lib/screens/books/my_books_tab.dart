@@ -123,7 +123,23 @@ class _MyBooksTabState extends State<MyBooksTab> {
                                             color: theme
                                                 .colorScheme.onSurfaceVariant)),
                                   const SizedBox(height: 6),
-                                  BookStatusChip(status: book.status),
+                                  Row(
+                                    children: [
+                                      BookStatusChip(status: book.status),
+                                      if (book.friendsOnly) ...[
+                                        const SizedBox(width: 6),
+                                        Icon(Icons.people_outline,
+                                            size: 16,
+                                            color: theme.colorScheme.outline),
+                                        const SizedBox(width: 2),
+                                        Text('친구 공개',
+                                            style: TextStyle(
+                                                fontSize: 12,
+                                                color:
+                                                    theme.colorScheme.outline)),
+                                      ],
+                                    ],
+                                  ),
                                 ],
                               ),
                             ),

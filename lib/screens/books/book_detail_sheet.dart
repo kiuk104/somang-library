@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../../models/book.dart';
+import '../../models/friendship.dart';
 import '../../models/library_user.dart';
 import '../../services/book_service.dart';
+import '../../services/friend_service.dart';
 import '../../services/loan_service.dart';
 import '../../widgets/place_picker.dart';
 import '../../widgets/book_cover.dart';
@@ -33,6 +35,8 @@ class _BookDetail extends StatefulWidget {
 
 class _BookDetailState extends State<_BookDetail> {
   bool _busy = false;
+  late final Stream<List<Friendship>> _friends =
+      FriendService.watchMine(widget.me.uid);
 
   Book get book => widget.book;
   LibraryUser get me => widget.me;
@@ -74,6 +78,28 @@ class _BookDetailState extends State<_BookDetail> {
           '신청했어요! ${book.ownerName}님이 수락하면 알려 드릴게요. (대여 탭에서 확인)');
     } catch (e) {
       _closeWith(messenger, LoanService.messageFor(e));
+    }
+  }
+
+  /// 소장자에게 친구 신청 / 받은 신청 수락
+  Future<void> _friendAction(FriendRelation rel) async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      if (rel == FriendRelation.receivedRequest) {
+        await FriendService.accept(book.ownerId);
+        _closeWith(messenger, '${book.ownerName}님과 친구가 되었어요!');
+      } else {
+        final r = await FriendService.request(book.ownerId);
+        _closeWith(
+            messenger,
+            r == 'accepted'
+                ? '${book.ownerName}님과 친구가 되었어요!'
+                : '${book.ownerName}님께 친구 신청을 보냈어요.');
+      }
+    } catch (e) {
+      _closeWith(messenger, FriendService.messageFor(e));
     }
   }
 
@@ -136,7 +162,21 @@ class _BookDetailState extends State<_BookDetail> {
                               color: theme.colorScheme.onSurfaceVariant)),
                     ],
                     const SizedBox(height: 12),
-                    BookStatusChip(status: book.status),
+                    Row(
+                      children: [
+                        BookStatusChip(status: book.status),
+                        if (book.friendsOnly) ...[
+                          const SizedBox(width: 8),
+                          Icon(Icons.people_outline,
+                              size: 16, color: theme.colorScheme.outline),
+                          const SizedBox(width: 2),
+                          Text('친구 공개',
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  color: theme.colorScheme.outline)),
+                        ],
+                      ],
+                    ),
                     const SizedBox(height: 12),
                     Text(
                       _mine ? '내 책' : '소장: ${book.ownerName}',
@@ -205,6 +245,43 @@ class _BookDetailState extends State<_BookDetail> {
               label: Text(book.isAvailable
                   ? '대여 신청'
                   : '지금은 신청할 수 없어요 · ${BookStatus.label(book.status)}'),
+            ),
+          if (!_mine)
+            StreamBuilder<List<Friendship>>(
+              stream: _friends,
+              builder: (context, snap) {
+                if (!snap.hasData) return const SizedBox.shrink();
+                final rel =
+                    FriendService.relationTo(snap.data!, book.ownerId);
+                switch (rel) {
+                  case FriendRelation.friend:
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: Text('${book.ownerName}님과 친구예요',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: theme.colorScheme.outline)),
+                    );
+                  case FriendRelation.sentRequest:
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: Text('${book.ownerName}님께 친구 신청을 보냈어요',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: theme.colorScheme.outline)),
+                    );
+                  case FriendRelation.receivedRequest:
+                  case FriendRelation.none:
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: OutlinedButton.icon(
+                        onPressed: _busy ? null : () => _friendAction(rel),
+                        icon: const Icon(Icons.person_add_alt_outlined),
+                        label: Text(rel == FriendRelation.receivedRequest
+                            ? '${book.ownerName}님의 친구 신청 수락'
+                            : '${book.ownerName}님께 친구 신청'),
+                      ),
+                    );
+                }
+              },
             ),
         ],
       ),

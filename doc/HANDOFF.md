@@ -1,6 +1,6 @@
 # 소망 도서관 — 작업 인수인계 (새 세션은 이 파일부터)
 
-> 마지막 갱신: 2026-10-05 · 규칙·구조는 `CLAUDE.md`, 설계 원본은 `E:\Coding\mustardseed\doc\LIBRARY_PLAN.md`
+> 마지막 갱신: 2026-10-05 (오후) · 규칙·구조는 `CLAUDE.md`, 설계 원본은 `E:\Coding\mustardseed\doc\LIBRARY_PLAN.md`
 
 ## 저장소 2개 (반드시 둘 다 연결해서 작업)
 | 폴더 | 역할 | 배포 |
@@ -20,8 +20,18 @@
   일정·장소 변경(`reschedule`), 토요일 18시 리마인드(`libraryWeeklyReminder`)
 - 알림함 `library_notifications` + FCM 웹 푸시 (VAPID 키 설정됨, 로그아웃 시 토큰 삭제)
 - 겨자씨: 마이페이지 "소망 도서관" 바로가기, 교인 계정 진입 차단
+- 서가 보기 방식: 표지 작게(기본)·보통·크게·목록 (`ShelfView`, 앱을 다시 열면 기본값)
+- 도움말 화면 (`help_screen.dart`) — 서가 앱바 `?` 와 내 정보 탭에서 열림
+- 도서관 담당자 지정 (`admin/librarian_screen.dart`, 스태프만 — 규칙이 이미 허용해서 클라이언트에서 직접 씀)
+- 새 가입 대기 교인 → 담당자에게 알림·푸시 (`notifyLibraryJoinRequest`, 담당자가 없으면 스태프)
+- 도서관 알림은 겨자씨 회원(role ≠ member)에게 겨자씨 쪽지(`messages`, fromId `system`)로도 발송 (`notifyLibrary`)
+- 친구: 신청→수락 (`library_friendships`, 함수 `friendAction`·`searchLibraryUsers`), 화면 `friends/friends_screen.dart`,
+  책 상세에서 소장자에게 친구 신청. 책 `visibility`('public'|'friends') — 등록·수정 화면의 "친구에게만 공개"
+  - 서가에서 숨기기는 앱(클라이언트)이 친구 목록으로 거른다. 신청은 `loanAction` 이 서버에서 친구 여부를 확인한다.
+  - 한계: 규칙 수준의 열람 차단은 아님 (API 로 직접 읽으면 목록은 보임). 필요하면 books 읽기 규칙 + 기존 책 visibility 채우기 마이그레이션이 필요.
 
 ## 확인 필요 / 남은 일
+- [ ] 2026-10-05 변경 배포: 규칙(`--dry-run` 먼저, 테스트 `npm test`) → 함수(notifyLibraryJoinRequest·friendAction·searchLibraryUsers·loanAction·libraryWeeklyReminder) → hosting. 함수·규칙은 mustardseed `feature/church-member-auth` 브랜치에서
 - [ ] 대여·알림·일정 변경 배포 후 실제 기기 테스트 (규칙 → 함수 → hosting 순)
 - [ ] 카카오 키 설정·`lookupBook` 동작 확인 (한글 저자로 나오는지)
 - [ ] 아이폰: 홈 화면 추가 후 푸시 수신 확인
