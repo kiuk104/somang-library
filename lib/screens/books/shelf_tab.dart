@@ -24,6 +24,7 @@ class _ShelfTabState extends State<ShelfTab> {
   final _searchCtrl = TextEditingController();
   String _query = '';
   bool _onlyAvailable = false;
+  bool _listView = false; // false: 작은 표지 격자, true: 한 줄 목록
 
   @override
   void dispose() {
@@ -98,6 +99,28 @@ class _ShelfTabState extends State<ShelfTab> {
                               Text('${books.length}권',
                                   style: TextStyle(
                                       color: theme.colorScheme.outline)),
+                              const SizedBox(width: 8),
+                              SegmentedButton<bool>(
+                                showSelectedIcon: false,
+                                style: const ButtonStyle(
+                                  visualDensity: VisualDensity.compact,
+                                  padding: WidgetStatePropertyAll(
+                                      EdgeInsets.symmetric(horizontal: 4)),
+                                ),
+                                segments: const [
+                                  ButtonSegment(
+                                      value: false,
+                                      icon: Icon(Icons.grid_view, size: 18),
+                                      tooltip: '표지로 보기'),
+                                  ButtonSegment(
+                                      value: true,
+                                      icon: Icon(Icons.view_list, size: 18),
+                                      tooltip: '목록으로 보기'),
+                                ],
+                                selected: {_listView},
+                                onSelectionChanged: (v) =>
+                                    setState(() => _listView = v.first),
+                              ),
                             ],
                           ),
                         ],
@@ -118,16 +141,29 @@ class _ShelfTabState extends State<ShelfTab> {
                         ),
                       ),
                     )
+                  else if (_listView)
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(8, 0, 8, 32),
+                      sliver: SliverList.separated(
+                        itemCount: books.length,
+                        separatorBuilder: (_, _) => const Divider(height: 1),
+                        itemBuilder: (context, i) => _ShelfRow(
+                          book: books[i],
+                          onTap: () =>
+                              showBookDetail(context, books[i], widget.me),
+                        ),
+                      ),
+                    )
                   else
                     SliverPadding(
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
                       sliver: SliverGrid(
                         gridDelegate:
                             const SliverGridDelegateWithMaxCrossAxisExtent(
-                          maxCrossAxisExtent: 150,
-                          mainAxisSpacing: 16,
-                          crossAxisSpacing: 14,
-                          childAspectRatio: 0.45, // 표지(1:1.5) + 제목 2줄 + 소장자
+                          maxCrossAxisExtent: 96, // 폰에서 4열
+                          mainAxisSpacing: 12,
+                          crossAxisSpacing: 10,
+                          childAspectRatio: 0.46, // 표지(1:1.5) + 제목 2줄 + 소장자
                         ),
                         delegate: SliverChildBuilderDelegate(
                           (context, i) => _ShelfItem(
@@ -186,15 +222,69 @@ class _ShelfItem extends StatelessWidget {
             Text(book.title,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
             Text(
               book.isAvailable ? book.ownerName : BookStatus.label(book.status),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 12, color: theme.colorScheme.outline),
+              style: TextStyle(fontSize: 11, color: theme.colorScheme.outline),
             ),
           ],
         ),
+    );
+  }
+}
+
+/// 목록 보기 — 작은 표지 + 제목 / 저자·소장자 + 상태
+class _ShelfRow extends StatelessWidget {
+  final Book book;
+  final VoidCallback onTap;
+  const _ShelfRow({required this.book, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final sub = [
+      if (book.author.isNotEmpty) book.author,
+      book.ownerName,
+    ].join(' · ');
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        child: Row(
+          children: [
+            Opacity(
+              opacity: book.isAvailable ? 1 : 0.45,
+              child: BookCover(
+                  coverUrl: book.coverUrl, title: book.title, width: 36),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(book.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w600, fontSize: 14)),
+                  const SizedBox(height: 2),
+                  Text(sub,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          fontSize: 12, color: theme.colorScheme.outline)),
+                ],
+              ),
+            ),
+            if (!book.isAvailable) ...[
+              const SizedBox(width: 8),
+              BookStatusChip(status: book.status),
+            ],
+          ],
+        ),
+      ),
     );
   }
 }
