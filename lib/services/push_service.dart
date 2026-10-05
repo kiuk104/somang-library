@@ -10,7 +10,8 @@ import 'package:flutter/foundation.dart';
 class PushService {
   /// Firebase 콘솔 → 프로젝트 설정 → 클라우드 메시징 → 웹 푸시 인증서 → 키 쌍 (공개 키)
   /// 비어 있으면 알림 켜기 버튼을 숨긴다.
-  static const vapidKey = '';
+  static const vapidKey =
+      'BMsxb32Ia60TROhnXYjdk27TFZ3ubnIMAsW_jFd-XFFrEoA8XYihRzjy8J_ekFfje0IX-PX9d5fe0b6vLKL7THc';
 
   static bool get configured => vapidKey.isNotEmpty;
 
