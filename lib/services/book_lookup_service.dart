@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:http/http.dart' as http;
 
 /// 책 정보 검색 결과 (등록 폼을 채우는 데 쓴다)
@@ -21,8 +22,9 @@ class BookInfo {
 }
 
 /// ISBN·제목으로 책 정보 찾기
-/// 1) Google Books (API 키 없이 사용, 한국·독일 책 대부분)
-/// 2) ISBN 인데 못 찾으면 Open Library 로 한 번 더
+/// 1) 카카오 책 검색 (한국 책 — 저자·역자·출판사가 한글로). Cloud Function lookupBook 경유
+/// 2) Google Books (독일·영어 책 등)
+/// 3) ISBN 인데 못 찾으면 Open Library
 class BookLookupService {
   static const _timeout = Duration(seconds: 10);
 
@@ -34,18 +36,78 @@ class BookLookupService {
     return null;
   }
 
+  /// 바코드 스캔 값에서 책 ISBN 찾기
+  /// - 978/979 로 시작하는 13자리 (부가기호가 붙어 18자리로 읽혀도 앞 13자리)
+  /// - 체크섬이 맞는 것만 인정
+  static String? findIsbnInScan(String raw) {
+    final digits = raw.replaceAll(RegExp(r'[^0-9]'), '');
+    for (final m in RegExp(r'97[89]\d{10}').allMatches(digits)) {
+      final isbn = m.group(0)!;
+      if (_validIsbn13(isbn)) return isbn;
+    }
+    return null;
+  }
+
+  static bool _validIsbn13(String s) {
+    var sum = 0;
+    for (var i = 0; i < 12; i++) {
+      sum += int.parse(s[i]) * (i.isEven ? 1 : 3);
+    }
+    return (10 - sum % 10) % 10 == int.parse(s[12]);
+  }
+
   /// 검색어가 ISBN 이면 ISBN 검색, 아니면 제목·저자 검색
   static Future<List<BookInfo>> search(String query) async {
     final q = query.trim();
     if (q.isEmpty) return const [];
     final isbn = cleanIsbn(q);
     if (isbn != null) {
+      final kakao = await _kakao(isbn);
+      if (kakao.isNotEmpty) return kakao;
       final google = await _google('isbn:$isbn');
       if (google.isNotEmpty) return google;
       final open = await _openLibrary(isbn);
       return open == null ? const [] : [open];
     }
-    return _google(q);
+    // 제목 검색: 카카오(한국 책) 결과를 먼저, 그 뒤에 Google 결과 (같은 ISBN 은 빼고)
+    final results = await Future.wait([_kakao(q), _google(q)]);
+    final kakao = results[0];
+    final seen = kakao.map((b) => b.isbn).where((s) => s.isNotEmpty).toSet();
+    return [
+      ...kakao,
+      ...results[1].where((b) => b.isbn.isEmpty || !seen.contains(b.isbn)),
+    ];
+  }
+
+  /// 카카오 책 검색 — API 키는 서버(함수)에만 있다. 함수가 없거나 실패하면 빈 목록
+  static Future<List<BookInfo>> _kakao(String q) async {
+    try {
+      final res = await FirebaseFunctions.instanceFor(region: 'europe-west1')
+          .httpsCallable('lookupBook')
+          .call({'query': q})
+          .timeout(_timeout);
+      final data = Map<String, dynamic>.from(res.data as Map);
+      final list = (data['books'] as List?) ?? const [];
+      return list.whereType<Map>().map((m) {
+        List<String> names(dynamic v) =>
+            (v as List?)?.map((e) => '$e').where((e) => e.isNotEmpty).toList() ??
+            const [];
+        final authors = names(m['authors']).join(', ');
+        final translators = names(m['translators']);
+        return BookInfo(
+          title: m['title']?.toString() ?? '',
+          author: translators.isEmpty
+              ? authors
+              : '$authors (${translators.join(', ')} 옮김)',
+          publisher: m['publisher']?.toString() ?? '',
+          isbn: m['isbn']?.toString() ?? '',
+          coverUrl: m['thumbnail']?.toString() ?? '',
+          year: m['year']?.toString() ?? '',
+        );
+      }).where((b) => b.title.isNotEmpty).toList();
+    } catch (_) {
+      return const [];
+    }
   }
 
   static Future<List<BookInfo>> _google(String q) async {
