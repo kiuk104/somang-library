@@ -46,6 +46,45 @@
       if (el) el.remove();
     });
   </script>
+  <script>
+    // 사진에서 책 바코드 읽기 — zxing-wasm (web/zxing, MIT) 을 처음 쓸 때만 불러온다.
+    // Dart 쪽: lib/services/photo_barcode.dart
+    (function () {
+      var ready = null;
+      function load() {
+        if (ready) return ready;
+        ready = new Promise(function (resolve, reject) {
+          var s = document.createElement('script');
+          s.src = 'zxing/reader.js';
+          s.onload = function () {
+            ZXingWASM.prepareZXingModule({
+              overrides: {
+                locateFile: function (path, prefix) {
+                  return path.endsWith('.wasm')
+                    ? new URL('zxing/zxing_reader.wasm', document.baseURI).href
+                    : prefix + path;
+                }
+              }
+            });
+            resolve();
+          };
+          s.onerror = function () { ready = null; reject(new Error('바코드 인식 모듈을 불러오지 못했어요')); };
+          document.head.appendChild(s);
+        });
+        return ready;
+      }
+      window.somangReadBarcodes = async function (image) {
+        await load();
+        var results = await ZXingWASM.readBarcodes(image, {
+          formats: ['EAN-13', 'EAN-8', 'UPC-A'],
+          tryHarder: true,
+          maxNumberOfSymbols: 4
+        });
+        return results.filter(function (r) { return r.isValid; })
+                      .map(function (r) { return r.text; });
+      };
+    })();
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

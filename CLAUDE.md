@@ -29,7 +29,9 @@
 - 필드: ownerId, ownerName(복사), title, author, publisher, isbn, coverUrl, note, status, createdAt, updatedAt
 - 문자열 필드는 null 금지(빈 문자열) — 규칙 `isValidBook`
 - status: `available`·`hidden` 은 소장자가, `requested`·`lent` 는 대여 함수가 바꾼다 (진행 중엔 소장자 수정·삭제 불가)
-- 책 정보 검색: `BookLookupService` (Google Books → Open Library), 바코드: `mobile_scanner` (웹은 https/localhost 에서만 카메라)
+- 책 정보 검색: `BookLookupService` (카카오 lookupBook 함수 → Google Books → Open Library)
+- 바코드: 폰 기본 카메라 사진(`image_picker`) → `web/zxing`(zxing-wasm, 자체 호스팅) — `web/index.html` 의 `somangReadBarcodes`.
+  브라우저 실시간 카메라·내장 BarcodeDetector 는 갤럭시에서 인식 실패해서 쓰지 않는다
 - 표지 이미지: `BookCover` — `cacheWidth` + `WebHtmlElementStrategy.fallback`(CORS 없는 표지 서버 대응)
 
 ## 화면 흐름

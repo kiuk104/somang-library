@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../models/book.dart';
 import '../../models/library_user.dart';
 import '../../services/book_lookup_service.dart';
 import '../../services/book_service.dart';
+import '../../services/photo_barcode.dart';
 import '../../widgets/book_cover.dart';
 import '../../widgets/page_frame.dart';
-import 'barcode_scan_screen.dart';
 
 /// 책 등록 / 수정
 /// 등록: 바코드 또는 ISBN·제목으로 찾아서 고르면 칸이 채워진다. 못 찾으면 직접 입력.
@@ -60,11 +61,44 @@ class _BookFormScreenState extends State<BookFormScreen> {
     super.dispose();
   }
 
+  /// 바코드 사진 찍기 — 폰 기본 카메라(자동초점)로 찍고 zxing-wasm 으로 ISBN 을 읽는다
+  /// (한국 책의 5자리 부가기호가 같이 찍혀도 978/979 13자리만 골라낸다)
   Future<void> _scan() async {
-    final isbn = await Navigator.of(context).push<String>(
-      MaterialPageRoute(builder: (_) => const BarcodeScanScreen()),
+    if (_searching) return;
+    final photo = await ImagePicker().pickImage(
+      source: ImageSource.camera,
+      maxWidth: 2000, // 너무 큰 사진은 줄여서 빠르게
+      imageQuality: 90,
     );
-    if (isbn == null || !mounted) return;
+    if (photo == null || !mounted) return;
+
+    setState(() => _searching = true);
+    String? isbn;
+    List<String> values = const [];
+    String? error;
+    try {
+      final bytes = await photo.readAsBytes();
+      values = await PhotoBarcode.read(bytes, photo.mimeType ?? 'image/jpeg');
+      for (final v in values) {
+        isbn ??= BookLookupService.findIsbnInScan(v);
+      }
+    } catch (e) {
+      error = '$e';
+    }
+    if (!mounted) return;
+    setState(() => _searching = false);
+
+    if (isbn == null) {
+      showSnack(
+        context,
+        error != null
+            ? '사진을 읽지 못했어요. 번호를 직접 입력해 주세요. ($error)'
+            : values.isEmpty
+                ? '바코드를 못 찾았어요. 바코드가 사진 가운데에 크게, 선명하게 나오게 다시 찍어 주세요.'
+                : '읽힌 값(${values.join(', ')})이 책 ISBN 이 아니에요. 978로 시작하는 바코드를 찍어 주세요.',
+      );
+      return;
+    }
     _queryCtrl.text = isbn;
     await _search();
   }
@@ -166,8 +200,15 @@ class _BookFormScreenState extends State<BookFormScreen> {
               // ── 찾기
               FilledButton.icon(
                 onPressed: _scan,
-                icon: const Icon(Icons.qr_code_scanner),
-                label: const Text('바코드 찍어서 찾기'),
+                icon: const Icon(Icons.photo_camera_outlined),
+                label: const Text('바코드 사진 찍어서 찾기'),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                '책 뒷면 바코드를 가까이서 선명하게 찍어 주세요. 안 되면 아래에 ISBN 숫자를 입력해도 돼요.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                    fontSize: 12, color: Theme.of(context).colorScheme.outline),
               ),
               const SizedBox(height: 12),
               TextField(

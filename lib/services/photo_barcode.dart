@@ -1,32 +1,24 @@
 import 'dart:js_interop';
-import 'dart:js_interop_unsafe';
+import 'dart:typed_data';
 
 import 'package:web/web.dart' as web;
 
-/// 브라우저 내장 BarcodeDetector (Chrome·Android, Safari 17+)
-@JS('BarcodeDetector')
-extension type _BarcodeDetector._(JSObject _) implements JSObject {
-  external _BarcodeDetector();
-  external JSPromise<JSArray<_DetectedBarcode>> detect(JSObject image);
-}
-
-extension type _DetectedBarcode._(JSObject _) implements JSObject {
-  external String get rawValue;
-}
+/// web/index.html 의 somangReadBarcodes — zxing-wasm(web/zxing 에 자체 호스팅)으로
+/// 이미지에서 EAN-13/EAN-8/UPC-A 바코드를 읽어 문자열 배열을 돌려준다.
+@JS('somangReadBarcodes')
+external JSPromise<JSArray<JSString>> _readBarcodes(web.Blob image);
 
 /// 찍은 사진에서 바코드 읽기
 ///
-/// 실시간 카메라(웹)는 해상도가 낮고 초점이 잘 안 맞아 책 바코드를 놓치는 경우가 많다.
-/// 폰 기본 카메라로 찍은 사진은 자동초점·고해상도라 훨씬 잘 읽힌다.
+/// 브라우저 실시간 카메라·내장 BarcodeDetector 는 기기(특히 갤럭시)에 따라 전혀 인식이 안 돼서
+/// 폰 기본 카메라 사진 + zxing-wasm 으로 읽는다. (흐림·기울어짐에 강함, 아이폰 Safari 도 동작)
 class PhotoBarcode {
-  /// 이 브라우저가 BarcodeDetector 를 지원하는지
-  static bool get supported => globalContext.has('BarcodeDetector');
-
-  /// 이미지 주소(blob: URL 등)에서 읽힌 바코드 값들
-  static Future<List<String>> detect(String imageUrl) async {
-    final img = web.HTMLImageElement()..src = imageUrl;
-    await img.decode().toDart;
-    final found = await _BarcodeDetector().detect(img).toDart;
-    return found.toDart.map((b) => b.rawValue).toList();
+  static Future<List<String>> read(Uint8List bytes, String mimeType) async {
+    final blob = web.Blob(
+      <JSAny>[bytes.toJS].toJS,
+      web.BlobPropertyBag(type: mimeType),
+    );
+    final values = await _readBarcodes(blob).toDart;
+    return values.toDart.map((s) => s.toDart).toList();
   }
 }
