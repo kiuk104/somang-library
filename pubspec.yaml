@@ -22,6 +22,9 @@ dependencies:
   http: ^1.2.0
   # ISBN 바코드 스캔 (웹: 브라우저 BarcodeDetector / zxing-wasm 자동 로드)
   mobile_scanner: ^7.4.0
+  # 사진으로 바코드 인식: 폰 기본 카메라(자동초점·고해상도)로 찍고 브라우저 BarcodeDetector 로 읽는다
+  image_picker: ^1.2.1
+  web: ^1.1.0
 
 dev_dependencies:
   flutter_test:

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../services/book_lookup_service.dart';
+import '../../services/photo_barcode.dart';
 
 /// 책 뒷면 ISBN 바코드 찍기 — 찾으면 ISBN 문자열을 돌려주며 닫힌다
 /// (웹은 https 또는 localhost 에서만 카메라 사용 가능)
@@ -22,6 +24,7 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
     facing: CameraFacing.back,
   );
   bool _done = false;
+  bool _readingPhoto = false;
   String _lastRaw = ''; // 화면에 보여줄 마지막으로 읽힌 값 (문제 확인용)
 
   @override
@@ -47,6 +50,45 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
         return;
       }
       if (raw != _lastRaw && mounted) setState(() => _lastRaw = raw);
+    }
+  }
+
+  /// 사진으로 찍기 — 폰 기본 카메라(자동초점)로 찍은 사진에서 바코드를 읽는다
+  Future<void> _takePhoto() async {
+    if (_readingPhoto) return;
+    final messenger = ScaffoldMessenger.of(context);
+    if (!PhotoBarcode.supported) {
+      messenger.showSnackBar(const SnackBar(
+          content: Text('이 브라우저는 사진 바코드 인식을 지원하지 않아요. 번호를 직접 입력해 주세요.')));
+      return;
+    }
+    // 실시간 카메라를 잠시 끄고(폰 카메라를 다른 앱이 쓸 수 있게) 기본 카메라로 찍는다
+    await _controller.stop();
+    final photo = await ImagePicker().pickImage(source: ImageSource.camera);
+    if (!mounted) return;
+    if (photo == null) {
+      await _controller.start();
+      return;
+    }
+    setState(() => _readingPhoto = true);
+    try {
+      final values = await PhotoBarcode.detect(photo.path);
+      for (final v in values) {
+        final isbn = BookLookupService.findIsbnInScan(v);
+        if (isbn != null) {
+          _finish(isbn);
+          return;
+        }
+      }
+      if (values.isNotEmpty && mounted) setState(() => _lastRaw = values.join(', '));
+      messenger.showSnackBar(const SnackBar(
+          content: Text('사진에서 ISBN 바코드를 못 찾았어요.\n바코드가 화면을 꽉 채우게, 초점을 맞춰 다시 찍어 주세요.')));
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text('사진을 읽지 못했어요. ($e)')));
+    } finally {
+      if (mounted) setState(() => _readingPhoto = false);
+      // 못 찾았으면 실시간 카메라 다시 켜기
+      if (mounted && !_done) await _controller.start();
     }
   }
 
@@ -124,8 +166,8 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
           IgnorePointer(
             child: Center(
               child: Container(
-                width: 300,
-                height: 150,
+                width: 320,
+                height: 200,
                 decoration: BoxDecoration(
                   border: Border.all(color: Colors.white, width: 2),
                   borderRadius: BorderRadius.circular(12),
@@ -141,8 +183,8 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Text(
-                  '책 뒷면의 ISBN 바코드(978…)를 네모 안에 맞춰 주세요.\n'
-                  '옆의 작은 바코드(부가기호)는 가리지 않아도 돼요.',
+                  '바코드가 네모를 꽉 채우도록 10cm 정도로 가까이 대 주세요.\n'
+                  '잘 안 되면 "사진으로 찍기"가 더 잘 돼요.',
                   textAlign: TextAlign.center,
                   style: TextStyle(color: Colors.white, fontSize: 14, height: 1.4),
                 ),
@@ -155,6 +197,18 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
                   ),
                 ],
                 const SizedBox(height: 16),
+                FilledButton.icon(
+                  style: FilledButton.styleFrom(minimumSize: const Size(200, 48)),
+                  onPressed: _readingPhoto ? null : _takePhoto,
+                  icon: _readingPhoto
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.photo_camera),
+                  label: const Text('사진으로 찍기'),
+                ),
+                const SizedBox(height: 10),
                 OutlinedButton.icon(
                   style: OutlinedButton.styleFrom(
                     foregroundColor: Colors.white,
