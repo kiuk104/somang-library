@@ -13,6 +13,12 @@ class WebPlatform {
   static const _kNoCovers = 'somang_exp_no_covers';
   static const _kEngine = 'somang_exp_engine'; // '' | 'cpu' | 'multi'
 
+  static const _kImgOff = 'somang_exp_img_off';
+
+  /// iOS 에서 표지를 <img> 로 그리는 것(prefer)을 끄고 CanvasKit(fallback)으로 되돌린다
+  static bool get imgCoversOff => _read(_kImgOff) == '1';
+  static set imgCoversOff(bool v) => _write(_kImgOff, v ? '1' : null);
+
   static bool get noCovers => _read(_kNoCovers) == '1';
   static set noCovers(bool v) => _write(_kNoCovers, v ? '1' : null);
 

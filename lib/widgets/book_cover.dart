@@ -53,9 +53,10 @@ class BookCover extends StatelessWidget {
                 // 종료된다 (flutter/flutter#152709). Safari 는 <img> 요소를 따로
                 // 최적화하므로 iOS 에서는 항상 <img> 로 그린다 (prefer).
                 // 그 외 플랫폼: 표지 서버가 CORS 를 안 열어 줄 때만 <img> (fallback).
-                webHtmlElementStrategy: WebPlatform.isIosWebKit
-                    ? WebHtmlElementStrategy.prefer
-                    : WebHtmlElementStrategy.fallback,
+                webHtmlElementStrategy:
+                    WebPlatform.isIosWebKit && !WebPlatform.imgCoversOff
+                        ? WebHtmlElementStrategy.prefer
+                        : WebHtmlElementStrategy.fallback,
                 errorBuilder: (_, _, _) => placeholder,
               ),
       ),

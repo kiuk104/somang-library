@@ -221,6 +221,12 @@ class _ExperimentCardState extends State<_ExperimentCard> {
             subtitle: const Text('하나씩 바꿔 가며 서가를 스크롤해 보고, 결과를 알려 주세요.'),
           ),
           SwitchListTile(
+            title: const Text('표지를 <img>로 그리기 끄기'),
+            subtitle: const Text('켜면 예전 방식(CanvasKit)으로 표지를 그려요 — 서가를 다시 열어야 적용'),
+            value: WebPlatform.imgCoversOff,
+            onChanged: (v) => setState(() => WebPlatform.imgCoversOff = v),
+          ),
+          SwitchListTile(
             title: const Text('표지 이미지 숨기기'),
             subtitle: const Text('표지 대신 제목 카드만 보여요'),
             value: WebPlatform.noCovers,
