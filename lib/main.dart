@@ -9,6 +9,10 @@ import 'services/invite_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // 이미지 디코딩 캐시 상한 (기본 100MB). iOS Safari 는 탭 메모리가 넉넉하지
+  // 않아 강제 종료되기 쉬우므로 낮게 잡는다 (겨자씨와 같은 대책).
+  PaintingBinding.instance.imageCache.maximumSizeBytes = 32 << 20; // 32MB
+  PaintingBinding.instance.imageCache.maximumSize = 200;
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   // 초대 링크(?invite=CODE)로 들어왔으면 코드를 기억해 둔다
   InviteService.captureFromUrl();

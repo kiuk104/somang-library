@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../app_theme.dart';
 import '../models/book.dart';
+import '../utils/web_platform.dart';
 
 /// 책 표지 — 표지 이미지가 없거나 못 불러오면 제목으로 만든 표지를 보여준다
 class BookCover extends StatelessWidget {
@@ -47,8 +48,14 @@ class BookCover extends StatelessWidget {
                 fit: BoxFit.cover,
                 // iOS Safari 메모리 대책: 화면 크기만큼만 디코딩
                 cacheWidth: (width * dpr).round(),
-                // 표지 서버가 CORS 를 안 열어 줘도 <img> 로 대신 그린다
-                webHtmlElementStrategy: WebHtmlElementStrategy.fallback,
+                // iPhone/iPad(WebKit): CanvasKit 이 이미지를 디코딩해 WebGL 텍스처로
+                // 올리는 경로가 Safari 의 탭 메모리 상한을 쉽게 넘겨 페이지가 강제
+                // 종료된다 (flutter/flutter#152709). Safari 는 <img> 요소를 따로
+                // 최적화하므로 iOS 에서는 항상 <img> 로 그린다 (prefer).
+                // 그 외 플랫폼: 표지 서버가 CORS 를 안 열어 줄 때만 <img> (fallback).
+                webHtmlElementStrategy: WebPlatform.isIosWebKit
+                    ? WebHtmlElementStrategy.prefer
+                    : WebHtmlElementStrategy.fallback,
                 errorBuilder: (_, _, _) => placeholder,
               ),
       ),
