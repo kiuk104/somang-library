@@ -12,12 +12,10 @@ import 'utils/web_platform.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // iOS 는 CPU 렌더링(index.html 참고)이라 느리므로 3x 화면을 2x 로 그린다.
-  // 글씨가 아주 약간 덜 선명해지는 대신 그릴 픽셀이 절반 가까이 줄어든다.
-  if (WebPlatform.lowDpr) {
-    final dpr = WidgetsBinding.instance.platformDispatcher.views.first.devicePixelRatio;
-    if (dpr > 2) ui_web.debugOverrideDevicePixelRatio(2.0);
-  }
+  // 3x iOS 기기는 CPU 렌더링(index.html 참고)이라 느리므로 화면 배율을 낮춰 그린다.
+  // 기본 2x (픽셀 55% 감소), 최저사양 1x (픽셀 1/9, 글씨가 거칠어짐). 도움말 '실험' 에서 선택.
+  final dpr = WebPlatform.dprOverride;
+  if (dpr != null) ui_web.debugOverrideDevicePixelRatio(dpr);
   // 이미지 디코딩 캐시 상한 (기본 100MB). iOS Safari 는 탭 메모리가 넉넉하지
   // 않아 강제 종료되기 쉬우므로 낮게 잡는다 (겨자씨와 같은 대책).
   PaintingBinding.instance.imageCache.maximumSizeBytes = 32 << 20; // 32MB

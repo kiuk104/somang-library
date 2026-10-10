@@ -54,6 +54,11 @@
 - Firestore: `where + orderBy` 조합 금지(정렬은 클라이언트), 목록 쿼리 `.limit()` 필수
 - `snapshots()` 스트림은 `build()` 가 아니라 State 필드(initState/late final)에 보관
 - 이미지 업로드는 압축 후, 네트워크 이미지는 `cacheWidth` 지정 (iOS Safari 메모리)
+- **아이폰 강제 종료 대책 (2026-10-10 확정)**: 원인은 CanvasKit 이 이미지를 WebGL 텍스처로 올리는 경로의
+  GPU 메모리 (flutter/flutter#152709). 실험 결과 CPU 렌더링만 살아남음. GPU 메모리는 배율 제곱이라
+  **3x iOS 기기(미니 등)만** 죽고 2x(SE)는 멀쩡 → `web/index.html` 이 `devicePixelRatio >= 3` 인 iOS 에만
+  `canvasKitForceCpuOnly` 를 켜고, `main.dart` 가 배율을 2x 로 낮춘다(`WebPlatform.dprOverride`, 1x 최저사양 선택 가능).
+  도움말 '실험' 카드(`help_screen.dart`)에서 렌더링·해상도를 바꿀 수 있고 localStorage 에 저장된다
 - **iOS(WebKit) 에서는 네트워크 이미지를 `<img>` 로 그린다** — `WebPlatform.isIosWebKit` 이면
   `webHtmlElementStrategy: WebHtmlElementStrategy.prefer`, 그 외는 `fallback` (`BookCover` 참고).
   CanvasKit 의 이미지 → WebGL 텍스처 경로가 Safari 탭 메모리 상한을 넘겨 페이지가 강제 종료된다

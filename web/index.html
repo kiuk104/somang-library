@@ -62,10 +62,13 @@
       // iOS 는 기본을 CPU 렌더링으로 둔다. 도움말 '실험' 에서 'gpu' 로 되돌려 볼 수 있다.
       var isIos = /iPhone|iPad|iPod/.test(navigator.userAgent) ||
           (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      // GPU 메모리는 배율의 제곱에 비례 — 3x 기기(미니 등)만 죽고 2x(SE 등)는 WebGL 로도 멀쩡했다.
+      // 그래서 CPU 렌더링은 3x 이상 iOS 기기에만 자동 적용한다.
+      var isIosHighDpr = isIos && (window.devicePixelRatio || 1) >= 3;
       var config = {};
       try {
         var mode = window.localStorage.getItem('somang_exp_engine') || '';
-        if (mode === '') mode = isIos ? 'cpu' : 'gpu';
+        if (mode === '') mode = isIosHighDpr ? 'cpu' : 'gpu';
         if (mode === 'cpu') {
           config.canvasKitForceCpuOnly = true;
         } else if (mode === 'multi') {

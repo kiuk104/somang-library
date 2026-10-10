@@ -14,17 +14,31 @@ class WebPlatform {
   static const _kEngine = 'somang_exp_engine'; // '' | 'cpu' | 'multi'
 
   static const _kImgOff = 'somang_exp_img_off';
-  static const _kLowDpr = 'somang_exp_low_dpr';
+  static const _kDpr = 'somang_exp_dpr';
 
-  /// iOS CPU 렌더링 속도 보완: 기기 픽셀 비율 3x → 2x (그릴 픽셀 55% 감소). 다시 불러와야 적용.
-  /// 기본값: iOS 면 켬 (명시적으로 '0' 이면 끔)
-  static bool get lowDpr {
-    final v = _read(_kLowDpr);
-    if (v == null) return isIosWebKit;
-    return v == '1';
+  /// 기기 픽셀 비율이 3 이상(iPhone 12 이후 대부분, 미니 포함)인 WebKit 기기.
+  /// GPU 메모리는 배율의 제곱에 비례해 이 기기들에서만 강제 종료가 난다 (SE 같은 2x 는 괜찮음).
+  static bool get isIosHighDpr => isIosWebKit && _rawDpr >= 3;
+
+  static double get _rawDpr => web.window.devicePixelRatio.toDouble();
+
+  /// 화면 해상도 배율: '3' 기기 그대로 / '2' / '1' 최저사양. 다시 불러와야 적용.
+  /// 기본값: 3x iOS 기기는 '2' (CPU 렌더링 속도 보완), 그 외는 기기 그대로.
+  static String get dprMode {
+    final v = _read(_kDpr);
+    if (v == '1' || v == '2' || v == '3') return v!;
+    return isIosHighDpr ? '2' : '3';
   }
 
-  static set lowDpr(bool v) => _write(_kLowDpr, v ? '1' : '0');
+  static set dprMode(String v) => _write(_kDpr, v);
+
+  /// 적용할 devicePixelRatio (null 이면 기기 그대로)
+  static double? get dprOverride {
+    final m = dprMode;
+    if (m == '3') return null;
+    final target = double.parse(m);
+    return _rawDpr > target ? target : null; // 원래보다 높게는 안 올린다
+  }
 
   /// iOS 에서 표지를 <img> 로 그리는 것(prefer)을 끄고 CanvasKit(fallback)으로 되돌린다
   static bool get imgCoversOff => _read(_kImgOff) == '1';

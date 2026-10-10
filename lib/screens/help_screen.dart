@@ -233,18 +233,25 @@ class _ExperimentCardState extends State<_ExperimentCard> {
             onChanged: (v) => setState(() => WebPlatform.noCovers = v),
           ),
           const Divider(height: 1),
-          SwitchListTile(
-            title: const Text('해상도 낮추기 (3x → 2x)'),
-            subtitle: const Text('CPU 렌더링 속도 보완. 바꾸면 다시 불러와요'),
-            value: WebPlatform.lowDpr,
-            onChanged: (v) {
-              WebPlatform.lowDpr = v;
-              WebPlatform.reload();
-            },
-          ),
+          for (final e in const [
+            ('3', '해상도: 기기 그대로 (3x)', '가장 선명, 가장 느림'),
+            ('2', '해상도: 2x', 'CPU 렌더링 기본값 — 거의 안 느껴지는 화질 차이'),
+            ('1', '해상도: 1x (최저사양)', '화질 낮음, 가장 빠름'),
+          ])
+            RadioListTile<String>(
+              title: Text(e.$2),
+              subtitle: Text(e.$3),
+              value: e.$1,
+              groupValue: WebPlatform.dprMode,
+              onChanged: (v) {
+                if (v == null) return;
+                WebPlatform.dprMode = v;
+                WebPlatform.reload();
+              },
+            ),
           const Divider(height: 1),
           RadioListTile<String>(
-            title: const Text('렌더링: 자동 (아이폰은 CPU)'),
+            title: const Text('렌더링: 자동 (3x 아이폰은 CPU)'),
             value: '',
             groupValue: engine,
             onChanged: _setEngine,
