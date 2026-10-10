@@ -54,6 +54,10 @@
 - Firestore: `where + orderBy` 조합 금지(정렬은 클라이언트), 목록 쿼리 `.limit()` 필수
 - `snapshots()` 스트림은 `build()` 가 아니라 State 필드(initState/late final)에 보관
 - 이미지 업로드는 압축 후, 네트워크 이미지는 `cacheWidth` 지정 (iOS Safari 메모리)
+- **iOS(WebKit) 에서는 네트워크 이미지를 `<img>` 로 그린다** — `WebPlatform.isIosWebKit` 이면
+  `webHtmlElementStrategy: WebHtmlElementStrategy.prefer`, 그 외는 `fallback` (`BookCover` 참고).
+  CanvasKit 의 이미지 → WebGL 텍스처 경로가 Safari 탭 메모리 상한을 넘겨 페이지가 강제 종료된다
+  (flutter/flutter#152709). 새로 `Image.network` 를 쓰는 곳도 같은 분기를 넣을 것
 - 본문은 `PageFrame` (가운데 maxWidth 560)
 
 ## 인수인계
