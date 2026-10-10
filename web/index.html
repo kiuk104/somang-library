@@ -57,9 +57,15 @@
     {{flutter_build_config}}
 
     (function () {
+      // iPhone/iPad(WebKit) 는 CanvasKit 이 이미지를 WebGL 텍스처로 올릴 때 GPU 메모리가 터져
+      // 페이지가 강제 종료된다 (flutter/flutter#152709). 실험 결과 CPU 렌더링만 살아남았으므로
+      // iOS 는 기본을 CPU 렌더링으로 둔다. 도움말 '실험' 에서 'gpu' 로 되돌려 볼 수 있다.
+      var isIos = /iPhone|iPad|iPod/.test(navigator.userAgent) ||
+          (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
       var config = {};
       try {
         var mode = window.localStorage.getItem('somang_exp_engine') || '';
+        if (mode === '') mode = isIos ? 'cpu' : 'gpu';
         if (mode === 'cpu') {
           config.canvasKitForceCpuOnly = true;
         } else if (mode === 'multi') {

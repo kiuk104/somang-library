@@ -14,6 +14,17 @@ class WebPlatform {
   static const _kEngine = 'somang_exp_engine'; // '' | 'cpu' | 'multi'
 
   static const _kImgOff = 'somang_exp_img_off';
+  static const _kLowDpr = 'somang_exp_low_dpr';
+
+  /// iOS CPU 렌더링 속도 보완: 기기 픽셀 비율 3x → 2x (그릴 픽셀 55% 감소). 다시 불러와야 적용.
+  /// 기본값: iOS 면 켬 (명시적으로 '0' 이면 끔)
+  static bool get lowDpr {
+    final v = _read(_kLowDpr);
+    if (v == null) return isIosWebKit;
+    return v == '1';
+  }
+
+  static set lowDpr(bool v) => _write(_kLowDpr, v ? '1' : '0');
 
   /// iOS 에서 표지를 <img> 로 그리는 것(prefer)을 끄고 CanvasKit(fallback)으로 되돌린다
   static bool get imgCoversOff => _read(_kImgOff) == '1';
@@ -22,7 +33,7 @@ class WebPlatform {
   static bool get noCovers => _read(_kNoCovers) == '1';
   static set noCovers(bool v) => _write(_kNoCovers, v ? '1' : null);
 
-  /// '' 기본(WebGL 단일 서피스) / 'cpu' CPU 렌더링 / 'multi' 다중 서피스+상한 2
+  /// '' 자동(iOS 는 CPU, 그 외 WebGL) / 'gpu' WebGL 강제 / 'cpu' CPU 렌더링 / 'multi' 다중 서피스+상한 2
   static String get engineMode => _read(_kEngine) ?? '';
   static set engineMode(String v) => _write(_kEngine, v.isEmpty ? null : v);
 

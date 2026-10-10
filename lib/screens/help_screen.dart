@@ -233,15 +233,32 @@ class _ExperimentCardState extends State<_ExperimentCard> {
             onChanged: (v) => setState(() => WebPlatform.noCovers = v),
           ),
           const Divider(height: 1),
+          SwitchListTile(
+            title: const Text('해상도 낮추기 (3x → 2x)'),
+            subtitle: const Text('CPU 렌더링 속도 보완. 바꾸면 다시 불러와요'),
+            value: WebPlatform.lowDpr,
+            onChanged: (v) {
+              WebPlatform.lowDpr = v;
+              WebPlatform.reload();
+            },
+          ),
+          const Divider(height: 1),
           RadioListTile<String>(
-            title: const Text('렌더링: 기본'),
+            title: const Text('렌더링: 자동 (아이폰은 CPU)'),
             value: '',
             groupValue: engine,
             onChanged: _setEngine,
           ),
           RadioListTile<String>(
+            title: const Text('렌더링: WebGL 강제'),
+            subtitle: const Text('아이폰에서 꺼지던 예전 방식'),
+            value: 'gpu',
+            groupValue: engine,
+            onChanged: _setEngine,
+          ),
+          RadioListTile<String>(
             title: const Text('렌더링: CPU 전용'),
-            subtitle: const Text('그래픽(WebGL) 메모리를 쓰지 않아요 — 조금 느릴 수 있어요'),
+            subtitle: const Text('그래픽(WebGL) 메모리를 쓰지 않아요'),
             value: 'cpu',
             groupValue: engine,
             onChanged: _setEngine,
