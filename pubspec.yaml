@@ -3,7 +3,7 @@ description: "소망 도서관 — 베를린 소망교회 교인들의 책 나�
 publish_to: 'none'
 
 # 배포 전 + 뒤 날짜를 올린다 (겨자씨와 같은 규칙)
-version: 0.1.0+20261010
+version: 0.1.1+20261010
 
 environment:
   sdk: ^3.10.4
