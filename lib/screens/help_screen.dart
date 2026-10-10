@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/library_user.dart';
 import '../widgets/page_frame.dart';
+import '../widgets/version_badge.dart';
 
 /// 도움말 — 처음 쓰는 교인을 위한 사용법 (항목을 눌러 펼쳐 본다)
 class HelpScreen extends StatelessWidget {
@@ -140,6 +141,11 @@ class HelpScreen extends StatelessWidget {
                   ],
                 ],
               ),
+            ),
+            // 앱 버전 (배포 날짜) — 아이폰 문제 확인 때 어떤 버전인지 알 수 있게
+            const Padding(
+              padding: EdgeInsets.only(top: 16),
+              child: VersionBadge(),
             ),
           ],
         ),
