@@ -235,7 +235,7 @@ class _ExperimentCardState extends State<_ExperimentCard> {
           const Divider(height: 1),
           for (final e in const [
             ('3', '해상도: 기기 그대로 (3x)', '가장 선명, 가장 느림'),
-            ('2', '해상도: 2x', 'CPU 렌더링 기본값 — 거의 안 느껴지는 화질 차이'),
+            ('2', '해상도: 2x', 'CPU 렌더링일 때 기본값 — 거의 안 느껴지는 화질 차이'),
             ('1', '해상도: 1x (최저사양)', '화질 낮음, 가장 빠름'),
           ])
             RadioListTile<String>(
@@ -251,7 +251,10 @@ class _ExperimentCardState extends State<_ExperimentCard> {
             ),
           const Divider(height: 1),
           RadioListTile<String>(
-            title: const Text('렌더링: 자동 (3x 아이폰은 CPU)'),
+            title: const Text('렌더링: 자동'),
+            subtitle: Text(WebPlatform.engineAutoSwitched
+                ? '이 기기는 강제 종료가 감지돼 CPU 렌더링으로 자동 전환됐어요'
+                : '아이폰 미니는 CPU, 그 외는 WebGL — 2번 연속 강제 종료되면 CPU 로 자동 전환'),
             value: '',
             groupValue: engine,
             onChanged: _setEngine,

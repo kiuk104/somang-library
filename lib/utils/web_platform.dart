@@ -22,12 +22,18 @@ class WebPlatform {
 
   static double get _rawDpr => web.window.devicePixelRatio.toDouble();
 
+  /// index.html 이 이번 실행에 실제로 적용한 렌더링 ('cpu' | 'gpu' | 'multi')
+  static String get engineEffective => _read('somang_exp_engine_effective') ?? 'gpu';
+
+  /// 강제 종료 감지로 CPU 렌더링으로 자동 전환된 기기인지 (설정 카드 안내용)
+  static bool get engineAutoSwitched => _read('somang_exp_engine_auto') == '1';
+
   /// 화면 해상도 배율: '3' 기기 그대로 / '2' / '1' 최저사양. 다시 불러와야 적용.
-  /// 기본값: 3x iOS 기기는 '2' (CPU 렌더링 속도 보완), 그 외는 기기 그대로.
+  /// 기본값: CPU 렌더링 중인 3x 기기는 '2' (속도 보완), 그 외는 기기 그대로.
   static String get dprMode {
     final v = _read(_kDpr);
     if (v == '1' || v == '2' || v == '3') return v!;
-    return isIosHighDpr ? '2' : '3';
+    return (isIosHighDpr && engineEffective == 'cpu') ? '2' : '3';
   }
 
   static set dprMode(String v) => _write(_kDpr, v);
@@ -49,7 +55,11 @@ class WebPlatform {
 
   /// '' 자동(iOS 는 CPU, 그 외 WebGL) / 'gpu' WebGL 강제 / 'cpu' CPU 렌더링 / 'multi' 다중 서피스+상한 2
   static String get engineMode => _read(_kEngine) ?? '';
-  static set engineMode(String v) => _write(_kEngine, v.isEmpty ? null : v);
+  static set engineMode(String v) {
+    _write(_kEngine, v.isEmpty ? null : v);
+    _write('somang_exp_engine_auto', null); // 사용자가 직접 고르면 자동 전환 표시 해제
+    _write('somang_exp_gpu_strikes', null);
+  }
 
   static void reload() => web.window.location.reload();
 

@@ -55,9 +55,11 @@
 - `snapshots()` 스트림은 `build()` 가 아니라 State 필드(initState/late final)에 보관
 - 이미지 업로드는 압축 후, 네트워크 이미지는 `cacheWidth` 지정 (iOS Safari 메모리)
 - **아이폰 강제 종료 대책 (2026-10-10 확정)**: 원인은 CanvasKit 이 이미지를 WebGL 텍스처로 올리는 경로의
-  GPU 메모리 (flutter/flutter#152709). 실험 결과 CPU 렌더링만 살아남음. GPU 메모리는 배율 제곱이라
-  **3x iOS 기기(미니 등)만** 죽고 2x(SE)는 멀쩡 → `web/index.html` 이 `devicePixelRatio >= 3` 인 iOS 에만
-  `canvasKitForceCpuOnly` 를 켜고, `main.dart` 가 배율을 2x 로 낮춘다(`WebPlatform.dprOverride`, 1x 최저사양 선택 가능).
+  GPU 메모리 (flutter/flutter#152709). 실험 결과 CPU 렌더링만 살아남음. 메모리 적은 3x 기기(미니 4GB)만 죽고
+  2x(SE)·고사양 기종은 멀쩡 → `web/index.html` 이 (A) iPhone 미니 크기(375×812@3x)는 처음부터 `canvasKitForceCpuOnly`,
+  (B) 그 외 iOS 는 WebGL 로 시작하되 30분 안에 2번 연속 비정상 종료(localStorage `gpu_alive` 표시가 안 지워짐)면
+  CPU 로 자동 전환해 저장(`engine_auto`). CPU 렌더링 중인 3x 기기는 `main.dart` 가 배율을 2x 로 낮춘다
+  (`WebPlatform.dprOverride`, 1x 최저사양 선택 가능). 실제 적용된 모드는 `engine_effective` 키로 Dart 에 전달.
   도움말 '실험' 카드(`help_screen.dart`)에서 렌더링·해상도를 바꿀 수 있고 localStorage 에 저장된다
 - **iOS(WebKit) 에서는 네트워크 이미지를 `<img>` 로 그린다** — `WebPlatform.isIosWebKit` 이면
   `webHtmlElementStrategy: WebHtmlElementStrategy.prefer`, 그 외는 `fallback` (`BookCover` 참고).

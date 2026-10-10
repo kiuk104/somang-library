@@ -57,32 +57,75 @@
     {{flutter_build_config}}
 
     (function () {
-      // iPhone/iPad(WebKit) 는 CanvasKit 이 이미지를 WebGL 텍스처로 올릴 때 GPU 메모리가 터져
-      // 페이지가 강제 종료된다 (flutter/flutter#152709). 실험 결과 CPU 렌더링만 살아남았으므로
-      // iOS 는 기본을 CPU 렌더링으로 둔다. 도움말 '실험' 에서 'gpu' 로 되돌려 볼 수 있다.
+      var P = 'somang_exp_'; // localStorage 키 접두사 (Dart 쪽 WebPlatform 과 같은 키)
+      var LS = null;
+      try { LS = window.localStorage; } catch (e) {}
+      function get(k) { try { return LS ? LS.getItem(P + k) : null; } catch (e) { return null; } }
+      function set(k, v) { try { if (LS) LS.setItem(P + k, v); } catch (e) {} }
+      function del(k) { try { if (LS) LS.removeItem(P + k); } catch (e) {} }
+
       var isIos = /iPhone|iPad|iPod/.test(navigator.userAgent) ||
           (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-      // GPU 메모리는 배율의 제곱에 비례 — 3x 기기(미니 등)만 죽고 2x(SE 등)는 WebGL 로도 멀쩡했다.
-      // 그래서 CPU 렌더링은 3x 이상 iOS 기기에만 자동 적용한다.
-      var isIosHighDpr = isIos && (window.devicePixelRatio || 1) >= 3;
+      var dpr = window.devicePixelRatio || 1;
+      // A. iPhone 12/13 mini (375x812 @3x, 4GB) 는 CanvasKit 이 이미지를 WebGL 텍스처로 올릴 때
+      //    GPU 메모리가 터져 강제 종료된다 (flutter/flutter#152709). 이 크기는 처음부터 CPU 렌더링.
+      //    (같은 크기의 iPhone X/XS/11 Pro 도 메모리가 적어 함께 포함)
+      var sw = Math.min(screen.width, screen.height), sh = Math.max(screen.width, screen.height);
+      var isMiniSize = isIos && dpr >= 3 && sw === 375 && sh === 812;
+
+      // 사용자가 고른 값('gpu'|'cpu'|'multi') 이 있으면 그대로, 없으면('' 자동) 아래 규칙
+      var chosen = get('engine') || '';
+      var mode = chosen;
+      if (mode === '') mode = isMiniSize ? 'cpu' : 'gpu';
+
+      // B. 자가 복구: 자동 모드로 WebGL 을 쓰는 iOS 기기에서 "지난 실행이 정상 종료되지 않음" 이
+      //    30분 안에 2번 연속이면 이 기기는 강제 종료되는 기기로 보고 CPU 렌더링으로 전환해 저장한다.
+      //    (화면이 보일 때만 표시를 남기고, 숨겨지면 지워서 백그라운드 종료는 세지 않는다)
+      if (isIos && chosen === '' && mode === 'gpu') {
+        var now = Date.now();
+        var last = parseInt(get('gpu_alive') || '0', 10);
+        var strikes = parseInt(get('gpu_strikes') || '0', 10);
+        if (last && now - last < 30 * 60 * 1000) {
+          strikes += 1;
+        } else {
+          strikes = 0;
+        }
+        set('gpu_strikes', String(strikes));
+        if (strikes >= 2) {
+          set('engine', 'cpu');
+          set('engine_auto', '1'); // 설정 카드에 "강제 종료 감지로 자동 전환됨" 표시용
+          del('gpu_alive');
+          del('gpu_strikes');
+          mode = 'cpu';
+        } else {
+          var mark = function () { set('gpu_alive', String(Date.now())); };
+          var clear = function () { del('gpu_alive'); };
+          mark();
+          window.addEventListener('pagehide', clear);
+          document.addEventListener('visibilitychange', function () {
+            if (document.visibilityState === 'visible') mark(); else clear();
+          });
+        }
+      }
+      // Dart(main.dart) 가 해상도 기본값을 정할 때 참고
+      set('engine_effective', mode);
+
       var config = {};
-      try {
-        var mode = window.localStorage.getItem('somang_exp_engine') || '';
-        if (mode === '') mode = isIosHighDpr ? 'cpu' : 'gpu';
-        if (mode === 'cpu') {
-          config.canvasKitForceCpuOnly = true;
-        } else if (mode === 'multi') {
-          config.canvasKitForceMultiSurfaceRasterizer = true;
-          config.canvasKitMaximumSurfaces = 2;
-        }
-      } catch (e) {}
-      _flutter.loader.load({
-        config: config,
-        serviceWorkerSettings: {
-          serviceWorkerVersion: {{flutter_service_worker_version}}
-        }
-      });
+      if (mode === 'cpu') {
+        config.canvasKitForceCpuOnly = true;
+      } else if (mode === 'multi') {
+        config.canvasKitForceMultiSurfaceRasterizer = true;
+        config.canvasKitMaximumSurfaces = 2;
+      }
+      window.__appEngineConfig = config;
     })();
+
+    _flutter.loader.load({
+      config: window.__appEngineConfig,
+      serviceWorkerSettings: {
+        serviceWorkerVersion: {{flutter_service_worker_version}}
+      }
+    });
   </script>
 </body>
 </html>
