@@ -20,9 +20,15 @@
   일정·장소 변경(`reschedule`), 토요일 18시 리마인드(`libraryWeeklyReminder`)
 - 알림함 `library_notifications` + FCM 웹 푸시 (VAPID 키 설정됨, 로그아웃 시 토큰 삭제)
 - 겨자씨: 마이페이지 "소망 도서관" 바로가기, 교인 계정 진입 차단
+- 신청 가능 권수: 기본 3권 + 공개한 책(대여 쉼 제외) 3권마다 +1권, 최대 10권, 관리자 무제한 — 서버 `loanAction` request 에서 강제(`LOAN_LIMIT_*`). 연체 페널티: 연체 중 신청 불가 + 늦게 반납한 일수만큼(최대 28일, `LOAN_PENALTY_MAX_DAYS`) 신청 정지, 관리자 제외, 앱은 `LoanQuota`(`models/loan.dart`)·`QuotaCard`(내 정보). 값 바꾸면 양쪽 모두 수정
+- 서가 필터: 대여 가능만·친구 책만·소장자 고르기(이름 검색 시트) — 모두 클라이언트에서 거름 (`shelf_tab.dart`)
 - 서가 보기 방식: 표지 작게(기본)·보통·크게·목록 (`ShelfView`, 앱을 다시 열면 기본값)
 - 도움말 화면 (`help_screen.dart`) — 서가 앱바 `?` 와 내 정보 탭에서 열림
-- 교인 이름 수정 — 본인(내 정보 연필)·관리자(`admin/members_screen.dart`). 함수 `renameLibraryUser` 가 users 와 복사본(books·loans·library_friendships)을 함께 바꿈. 교인(role member)만, 청소년부 이름은 겨자씨에서
+- 교인 이름 수정 — 본인(내 정보 연필)·관리자(`admin/members_screen.dart`). 함수 `renameLibraryUser` 는 users.name 만 바꾸고, 트리거 `syncLibraryUserName` 이 복사본(books·loans·library_friendships)을 맞춤(겨자씨·콘솔에서 바꿔도 동작). `syncLibraryNames`(교인 이름 수정 화면의 동기화 버튼)는 이미 어긋난 기록을 일괄 보정. 이름 수정은 교인(role member)만, 청소년부 이름은 겨자씨에서
+- 알림함에서 친구 신청 바로 수락·거절 (`loans/notifications_screen.dart`) — 알림에 `type`/`fromId` 추가(서버 notifyLibrary·friendAction). 옛 알림은 fromId가 없어 본문 앞 이름으로 찾음 → functions 배포 없이도 동작, 배포하면 새 알림부터 uid로 정확히 매칭
+- 책 정보 보기 (`books/book_info_sheet.dart`, 책 상세의 버튼) — 앱 안 시트에 출판사·출간일·쪽수·정가·책 소개. 카카오(`lookupBook`, contents/date/price 필드 추가)+Google Books 합침. functions 배포 전에도 Google Books 만으로 동작(정가·카카오 소개는 배포 후). 못 찾으면 '알라딘에서 더 보기' 링크
+- 주고받기 되돌리기 — loanAction `undoHandover`(lent→accepted, 둘 다 가능, 반납일 삭제·책 reserved), 대여 탭 빌린 책/빌려준 책 카드에 버튼. 배포: functions:loanAction + hosting
+- 내 책 대여 현황 (`books/my_book_loans_screen.dart`) — 소장자용 보기 전용 화면. 책별 신청자·대여자·일정·장소·연체, 지난 기록, 요약 숫자. 진입: 내 책 탭 앱바 아이콘 / 대여 탭 맨 위 카드. loans(ownerId==나)와 books를 직접 구독, 서버·규칙 변경 없음
 - 전체 대여 현황 (`admin/admin_loans_screen.dart`) — 반납 지난 건·진행 중·지난 기록, 검색. 규칙이 관리자 loans 읽기를 이미 허용해 클라이언트만 추가
 - 도서관 담당자 지정 (`admin/librarian_screen.dart`, 스태프만 — 규칙이 이미 허용해서 클라이언트에서 직접 씀)
 - 새 가입 대기 교인 → 담당자에게 알림·푸시 (`notifyLibraryJoinRequest`, 담당자가 없으면 스태프)

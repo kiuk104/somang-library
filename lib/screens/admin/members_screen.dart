@@ -26,6 +26,7 @@ class _MembersScreenState extends State<MembersScreen> {
   final _searchCtrl = TextEditingController();
   String _query = '';
   final Set<String> _busy = {};
+  bool _syncing = false;
 
   @override
   void dispose() {
@@ -49,11 +50,66 @@ class _MembersScreenState extends State<MembersScreen> {
     }
   }
 
+  /// 이미 올라간 책·대여·친구 기록의 이름을 회원 이름에 맞춘다
+  Future<void> _sync() async {
+    if (_syncing) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('이름을 맞출까요?'),
+        content: const Text('이미 올라간 책 소장자 이름, 대여 기록, 친구 목록에서\n'
+            '회원 이름과 다르게 남은 것을 모두 현재 이름으로 고쳐요.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('취소')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('맞추기')),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    setState(() => _syncing = true);
+    try {
+      final r = await AccountService.syncNames();
+      if (mounted) {
+        final total = r.books + r.loans + r.friendships;
+        showSnack(
+            context,
+            total == 0
+                ? '이미 모두 맞아요.'
+                : '책 ${r.books}권, 대여 ${r.loans}건, 친구 ${r.friendships}건의 이름을 맞췄어요.');
+      }
+    } catch (e) {
+      if (mounted) showSnack(context, AccountService.messageFor(e));
+    } finally {
+      if (mounted) setState(() => _syncing = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('교인 이름 수정')),
+      appBar: AppBar(
+        title: const Text('교인 이름 수정'),
+        actions: [
+          _syncing
+              ? const Padding(
+                  padding: EdgeInsets.all(14),
+                  child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2.5)),
+                )
+              : IconButton(
+                  tooltip: '이미 올린 책·기록의 이름 맞추기',
+                  icon: const Icon(Icons.sync),
+                  onPressed: _sync,
+                ),
+        ],
+      ),
       body: PageFrame(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(

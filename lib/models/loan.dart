@@ -29,6 +29,59 @@ class LoanStatus {
   }
 }
 
+/// 신청 가능 권수 — 동시에 신청·수락·대여 중인 책의 한도
+/// 기본 3권, 공개한 책(대여 쉼 제외) 3권마다 +1권, 최대 10권. 도서관 관리자는 무제한.
+/// 서버(mustardseed functions/index.js 의 LOAN_LIMIT_*)와 같은 값을 쓴다 — 바꾸면 둘 다 고칠 것.
+class LoanQuota {
+  static const base = 3;
+  static const step = 3;
+  static const max = 10;
+
+  static int limitFor(int sharedBooks) {
+    final v = base + sharedBooks ~/ step;
+    return v > max ? max : v;
+  }
+
+  /// 연체 페널티 — 연체 중이면 새 신청 불가, 늦게 반납했다면 늦은 일수만큼(최대 28일) 신청 정지
+  /// 서버의 LOAN_PENALTY_MAX_DAYS 와 같은 값. [mine] 은 내가 빌린 대여 건.
+  static const penaltyMaxDays = 28;
+
+  static ({String? overdueTitle, String? blockedUntil}) penaltyFor(
+      Iterable<Loan> mine) {
+    final today = Loan.todayYmd();
+    String? overdueTitle;
+    String? until;
+    for (final l in mine) {
+      if (l.dueDate.isEmpty) continue;
+      if (l.isOverdue) {
+        overdueTitle ??= l.bookTitle;
+        continue;
+      }
+      final r = l.returnedAt;
+      if (l.status == LoanStatus.returned && r != null) {
+        final ret = Loan.ymdOf(r);
+        if (ret.compareTo(l.dueDate) > 0) {
+          final late =
+              DateTime.parse(ret).difference(DateTime.parse(l.dueDate)).inDays;
+          final days = late > penaltyMaxDays ? penaltyMaxDays : late;
+          final end = Loan.ymdOf(DateTime.parse(ret).add(Duration(days: days)));
+          if (end.compareTo(today) > 0 &&
+              (until == null || end.compareTo(until) > 0)) {
+            until = end;
+          }
+        }
+      }
+    }
+    return (overdueTitle: overdueTitle, blockedUntil: until);
+  }
+
+  /// 다음 +1권까지 더 공개해야 하는 책 수 (최대 한도면 null)
+  static int? booksToNext(int sharedBooks) {
+    if (limitFor(sharedBooks) >= max) return null;
+    return step - sharedBooks % step;
+  }
+}
+
 /// 주고받는 장소 (기본 선택지 + 직접 입력)
 class LoanPlaces {
   static const presets = <({String name, String hint})>[
@@ -57,6 +110,7 @@ class Loan {
   final String dueDate; // 'YYYY-MM-DD' (주일)
   final DateTime? requestedAt;
   final DateTime? updatedAt;
+  final DateTime? returnedAt; // 반납 완료 시각 (연체 페널티 계산용)
 
   const Loan({
     required this.id,
@@ -77,6 +131,7 @@ class Loan {
     required this.dueDate,
     this.requestedAt,
     this.updatedAt,
+    this.returnedAt,
   });
 
   bool get isActive =>
@@ -137,6 +192,7 @@ class Loan {
       dueDate: s('dueDate'),
       requestedAt: t('requestedAt'),
       updatedAt: t('updatedAt'),
+      returnedAt: t('returnedAt'),
     );
   }
 }
@@ -147,6 +203,8 @@ class LibraryNotice {
   final String title;
   final String body;
   final String loanId;
+  final String type; // 'friend_request' 등
+  final String fromId; // 알림을 일으킨 사람 uid (친구 신청 알림만)
   final bool read;
   final DateTime? createdAt;
 
@@ -155,6 +213,8 @@ class LibraryNotice {
     required this.title,
     required this.body,
     required this.loanId,
+    this.type = '',
+    this.fromId = '',
     required this.read,
     this.createdAt,
   });
@@ -167,6 +227,8 @@ class LibraryNotice {
       title: d['title']?.toString() ?? '',
       body: d['body']?.toString() ?? '',
       loanId: d['loanId']?.toString() ?? '',
+      type: d['type']?.toString() ?? '',
+      fromId: d['fromId']?.toString() ?? '',
       read: d['read'] == true,
       createdAt: c is Timestamp ? c.toDate() : null,
     );

@@ -7,6 +7,7 @@ import '../../widgets/book_cover.dart';
 import '../../widgets/page_frame.dart';
 import '../../widgets/place_picker.dart';
 import '../../widgets/push_card.dart';
+import '../books/my_book_loans_screen.dart';
 import 'notifications_screen.dart';
 
 /// 대여 — 신청 받기 · 주일 주고받기 · 빌린 책 · 빌려준 책 · 지난 기록
@@ -94,13 +95,25 @@ class _LoansTabState extends State<LoansTab> {
     if (!await _confirm(
         '주고받았어요',
         owner
-            ? '${l.borrowerName}님에게 「${l.bookTitle}」을(를) 건네줬나요?'
-            : '${l.ownerName}님에게 「${l.bookTitle}」을(를) 받았나요?',
+            ? '${l.borrowerName}님에게 「${l.bookTitle}」을(를) 건네줬나요?\n실제로 건네준 뒤에 눌러 주세요.'
+            : '${l.ownerName}님에게 「${l.bookTitle}」을(를) 받았나요?\n책을 실제로 받은 뒤에 눌러 주세요.',
         '네, 완료')) {
       return;
     }
     await _run(l, () => LoanService.handover(l.id),
         done: '대여가 시작됐어요. 반납일은 4주 뒤 주일이에요.');
+  }
+
+  /// 주고받았어요를 잘못 눌렀을 때 → 주고받기 예정 상태로 되돌린다
+  Future<void> _undoHandover(Loan l) async {
+    if (!await _confirm(
+        '주고받기 되돌리기',
+        '「${l.bookTitle}」 "주고받았어요"를 취소하고, 아직 전달 전인 상태로 되돌릴까요?\n상대방에게도 알려 드려요.',
+        '되돌리기')) {
+      return;
+    }
+    await _run(l, () => LoanService.undoHandover(l.id),
+        done: '되돌렸어요. 다시 "주고받기 예정"이에요.');
   }
 
   Future<void> _return(Loan l) async {
@@ -139,7 +152,7 @@ class _LoansTabState extends State<LoansTab> {
               child: const Icon(Icons.notifications_outlined),
             ),
             onPressed: () => Navigator.of(context).push(MaterialPageRoute(
-              builder: (_) => NotificationsScreen(notices: widget.notices),
+              builder: (_) => NotificationsScreen(me: widget.me, notices: widget.notices),
             )),
           ),
         ],
@@ -172,6 +185,15 @@ class _LoansTabState extends State<LoansTab> {
 
     final sections = <Widget>[
       const PushCard(),
+      Card(
+        child: ListTile(
+          leading: const Icon(Icons.assignment_outlined),
+          title: const Text('내 책 대여 현황'),
+          subtitle: const Text('내 책마다 누가 신청했고 누가 빌려 갔는지 · 지난 기록'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => MyBookLoansScreen.open(context, widget.me),
+        ),
+      ),
       if (incoming.isNotEmpty) ...[
         _header('신청이 왔어요', incoming.length),
         for (final l in incoming)
@@ -233,7 +255,10 @@ class _LoansTabState extends State<LoansTab> {
               '📍 반납 장소: ${l.returnPlace.isEmpty ? '정해지지 않음' : l.returnPlace}',
             ],
             busy: _busy.contains(l.id),
-            actions: [_Act('반납 일정·장소 변경', () => _reschedule(l))],
+            actions: [
+              _Act('아직 못 받았어요', () => _undoHandover(l)),
+              _Act('반납 일정·장소 변경', () => _reschedule(l)),
+            ],
           ),
       ],
       if (lentOut.isNotEmpty) ...[
@@ -249,6 +274,7 @@ class _LoansTabState extends State<LoansTab> {
             ],
             busy: _busy.contains(l.id),
             actions: [
+              _Act('주고받기 되돌리기', () => _undoHandover(l)),
               _Act('일정 변경', () => _reschedule(l)),
               _Act('돌려받았어요', () => _return(l), primary: true),
             ],

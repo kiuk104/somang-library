@@ -77,7 +77,7 @@ class _HomeShellState extends State<HomeShell> {
   @override
   Widget build(BuildContext context) {
     final pages = <Widget>[
-      ShelfTab(me: widget.me),
+      ShelfTab(me: widget.me, notices: _notices),
       MyBooksTab(me: widget.me),
       LoansTab(
         me: widget.me,

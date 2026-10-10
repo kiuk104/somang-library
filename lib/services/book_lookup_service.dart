@@ -10,6 +10,12 @@ class BookInfo {
   final String isbn;
   final String coverUrl;
   final String year;
+  // 책 정보 보기용 (검색 목록에서는 비어 있을 수 있다)
+  final String description; // 책 소개
+  final String date; // 출간일 'YYYY-MM-DD' 또는 'YYYY'
+  final int pages;
+  final int price; // 정가 (원)
+  final String link; // 소개 전문을 볼 수 있는 다음(Daum) 책 페이지 (카카오 결과만)
 
   const BookInfo({
     required this.title,
@@ -18,6 +24,11 @@ class BookInfo {
     this.isbn = '',
     this.coverUrl = '',
     this.year = '',
+    this.description = '',
+    this.date = '',
+    this.pages = 0,
+    this.price = 0,
+    this.link = '',
   });
 }
 
@@ -103,6 +114,10 @@ class BookLookupService {
           isbn: m['isbn']?.toString() ?? '',
           coverUrl: m['thumbnail']?.toString() ?? '',
           year: m['year']?.toString() ?? '',
+          description: m['contents']?.toString() ?? '',
+          date: m['date']?.toString() ?? '',
+          price: int.tryParse('${m['price'] ?? ''}') ?? 0,
+          link: m['url']?.toString() ?? '',
         );
       }).where((b) => b.title.isNotEmpty).toList();
     } catch (_) {
@@ -161,6 +176,57 @@ class BookLookupService {
       isbn: isbn,
       coverUrl: cover,
       year: date.length >= 4 ? date.substring(0, 4) : '',
+      description: _stripHtml(raw['description']?.toString() ?? ''),
+      date: date,
+      pages: int.tryParse('${raw['pageCount'] ?? ''}') ?? 0,
+    );
+  }
+
+  static String _stripHtml(String s) => s
+      .replaceAll(RegExp(r'<br\s*/?>|</p>', caseSensitive: false), '\n')
+      .replaceAll(RegExp(r'<[^>]*>'), '')
+      .replaceAll('&amp;', '&')
+      .replaceAll('&quot;', '"')
+      .replaceAll('&#39;', "'")
+      .trim();
+
+  /// 책 정보 보기 — ISBN 이 있으면 ISBN 으로, 없으면 제목·저자로 찾아
+  /// 카카오(한국 책: 정가·출간일·소개)와 Google Books(소개·쪽수)를 합친다. 못 찾으면 null
+  static Future<BookInfo?> details({
+    required String isbn,
+    required String title,
+    String author = '',
+  }) async {
+    final clean = cleanIsbn(isbn);
+    final q = clean ?? '$title $author'.trim();
+    if (q.isEmpty) return null;
+    final results = await Future.wait([
+      _kakao(q),
+      _google(clean != null ? 'isbn:$clean' : q),
+    ]);
+    final k = results[0].isEmpty ? null : results[0].first;
+    final g = results[1].isEmpty ? null : results[1].first;
+    if (k == null && g == null) return null;
+    final base = k ?? g!;
+    // 소개는 더 긴 쪽 (카카오는 앞부분만 줘서 짧다)
+    final kd = k?.description ?? '', gd = g?.description ?? '';
+    return BookInfo(
+      title: base.title,
+      author: base.author,
+      publisher: base.publisher,
+      isbn: base.isbn,
+      coverUrl: base.coverUrl,
+      year: base.year,
+      // 카카오 소개는 앞부분만 오므로(약 300자) 잘린 채 끝나면 … 를 붙여 준다
+      description: gd.length > kd.length
+          ? gd
+          : (kd.isNotEmpty && !RegExp(r'[.!?。」』”"\)]$').hasMatch(kd.trim())
+              ? '${kd.trim()}…'
+              : kd),
+      date: (k?.date.isNotEmpty ?? false) ? k!.date : (g?.date ?? ''),
+      pages: g?.pages ?? 0,
+      price: k?.price ?? 0,
+      link: k?.link ?? '',
     );
   }
 

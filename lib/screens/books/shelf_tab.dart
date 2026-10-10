@@ -7,10 +7,12 @@ import 'package:flutter/material.dart';
 import '../../models/book.dart';
 import '../../models/friendship.dart';
 import '../../models/library_user.dart';
+import '../../models/loan.dart';
 import '../../services/book_service.dart';
 import '../../services/friend_service.dart';
 import '../../widgets/book_cover.dart';
 import '../help_screen.dart';
+import '../loans/notifications_screen.dart';
 import 'book_detail_sheet.dart';
 
 /// 서가 보기 방식 — 격자 3단계(표지 크기) + 한 줄 목록
@@ -29,7 +31,8 @@ enum ShelfView {
 /// 서가 — 교인들이 등록한 모든 책 (검색 + 대여 가능만 보기)
 class ShelfTab extends StatefulWidget {
   final LibraryUser me;
-  const ShelfTab({super.key, required this.me});
+  final List<LibraryNotice> notices; // 알림 종 아이콘용 (HomeShell 이 내려줌)
+  const ShelfTab({super.key, required this.me, this.notices = const []});
 
   @override
   State<ShelfTab> createState() => _ShelfTabState();
@@ -41,7 +44,11 @@ class _ShelfTabState extends State<ShelfTab> {
   final _searchCtrl = TextEditingController();
   String _query = '';
   bool _onlyAvailable = false;
+  bool _onlyFriends = false; // 친구가 소장한 책만
+  String? _ownerId; // 고른 소장자 (null: 전체)
+  String _ownerName = '';
   ShelfView _view = ShelfView.small;
+  bool _showOwner = false; // 격자 보기에서 표지 아래 소장자 이름 표시 (기본 끔)
 
   // 내 친구 uid — '친구에게만 공개' 책은 소장자가 나이거나 친구일 때만 보인다
   Set<String> _friendIds = {};
@@ -70,6 +77,24 @@ class _ShelfTabState extends State<ShelfTab> {
     super.dispose();
   }
 
+  /// 소장자 고르기 (책이 있는 사람만, 이름 검색 가능)
+  Future<void> _pickOwner(List<_OwnerEntry> owners) async {
+    final picked = await showModalBottomSheet<_OwnerEntry?>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      useSafeArea: true,
+      constraints: const BoxConstraints(maxWidth: 560),
+      builder: (_) => _OwnerPicker(owners: owners, selectedId: _ownerId),
+    );
+    // 닫기만 하면 null, '전체 소장자'는 빈 id 로 돌아온다
+    if (picked == null) return;
+    setState(() {
+      _ownerId = picked.id.isEmpty ? null : picked.id;
+      _ownerName = picked.name;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -78,6 +103,18 @@ class _ShelfTabState extends State<ShelfTab> {
       appBar: AppBar(
         title: const Text('서가'),
         actions: [
+          IconButton(
+            tooltip: '알림',
+            icon: Badge(
+              isLabelVisible: widget.notices.any((n) => !n.read),
+              label: Text('${widget.notices.where((n) => !n.read).length}'),
+              child: const Icon(Icons.notifications_outlined),
+            ),
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+              builder: (_) =>
+                  NotificationsScreen(me: widget.me, notices: widget.notices),
+            )),
+          ),
           IconButton(
             tooltip: '도움말',
             icon: const Icon(Icons.help_outline),
@@ -98,8 +135,22 @@ class _ShelfTabState extends State<ShelfTab> {
           final all = BookService.sortNewest(
               snapshot.data!.docs.map(Book.fromDoc).where(_canSee));
           final q = _query.trim().toLowerCase();
+          // 소장자 고르기 목록 — 지금 볼 수 있는 책의 소장자 (책 많은 순)
+          final ownerMap = <String, _OwnerEntry>{};
+          for (final b in all) {
+            final e = ownerMap.putIfAbsent(
+                b.ownerId, () => _OwnerEntry(b.ownerId, b.ownerName));
+            e.count++;
+          }
+          final owners = ownerMap.values.toList()
+            ..sort((a, b) => b.count != a.count
+                ? b.count.compareTo(a.count)
+                : a.name.compareTo(b.name));
+
           final books = all.where((b) {
             if (_onlyAvailable && !b.isAvailable) return false;
+            if (_onlyFriends && !_friendIds.contains(b.ownerId)) return false;
+            if (_ownerId != null && b.ownerId != _ownerId) return false;
             if (q.isNotEmpty && !b.searchText.contains(q)) return false;
             return true;
           }).toList();
@@ -134,7 +185,9 @@ class _ShelfTabState extends State<ShelfTab> {
                             ),
                           ),
                           const SizedBox(height: 10),
-                          Row(
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 4,
                             children: [
                               FilterChip(
                                 label: const Text('대여 가능만'),
@@ -142,15 +195,47 @@ class _ShelfTabState extends State<ShelfTab> {
                                 onSelected: (v) =>
                                     setState(() => _onlyAvailable = v),
                               ),
-                              const Spacer(),
+                              FilterChip(
+                                avatar: const Icon(Icons.people_outline, size: 18),
+                                label: const Text('친구 책만'),
+                                selected: _onlyFriends,
+                                onSelected: (v) =>
+                                    setState(() => _onlyFriends = v),
+                              ),
+                              if (_ownerId == null)
+                                ActionChip(
+                                  avatar: const Icon(Icons.person_outline,
+                                      size: 18),
+                                  label: const Text('소장자'),
+                                  onPressed: () => _pickOwner(owners),
+                                )
+                              else
+                                InputChip(
+                                  avatar: const Icon(Icons.person, size: 18),
+                                  label: Text(_ownerName),
+                                  onPressed: () => _pickOwner(owners),
+                                  onDeleted: () =>
+                                      setState(() => _ownerId = null),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
                               Text('${books.length}권',
                                   style: TextStyle(
                                       color: theme.colorScheme.outline)),
-                              const SizedBox(width: 8),
-                              PopupMenuButton<ShelfView>(
+                              const Spacer(),
+                              PopupMenuButton<Object>(
                                 tooltip: '보기 방식',
                                 initialValue: _view,
-                                onSelected: (v) => setState(() => _view = v),
+                                onSelected: (v) => setState(() {
+                                  if (v is ShelfView) {
+                                    _view = v;
+                                  } else {
+                                    _showOwner = !_showOwner; // 소장자 표시 켜기/끄기
+                                  }
+                                }),
                                 itemBuilder: (_) => [
                                   for (final v in ShelfView.values)
                                     PopupMenuItem(
@@ -165,6 +250,12 @@ class _ShelfTabState extends State<ShelfTab> {
                                         ],
                                       ),
                                     ),
+                                  const PopupMenuDivider(),
+                                  CheckedPopupMenuItem<Object>(
+                                    value: 'owner',
+                                    checked: _showOwner,
+                                    child: const Text('소장자 이름 표시'),
+                                  ),
                                 ],
                                 child: Padding(
                                   padding: const EdgeInsets.all(6),
@@ -222,11 +313,12 @@ class _ShelfTabState extends State<ShelfTab> {
                           maxCrossAxisExtent: _view.maxExtent, // 작게 96 / 보통 120 / 크게 150
                           mainAxisSpacing: 12,
                           crossAxisSpacing: 10,
-                          childAspectRatio: 0.46, // 표지(1:1.5) + 제목 2줄 + 소장자
+                          childAspectRatio: _showOwner ? 0.46 : 0.5, // 표지(1:1.5) + 제목 2줄 (+ 소장자)
                         ),
                         delegate: SliverChildBuilderDelegate(
                           (context, i) => _ShelfItem(
                             book: books[i],
+                            showOwner: _showOwner,
                             onTap: () =>
                                 showBookDetail(context, books[i], widget.me),
                           ),
@@ -246,8 +338,10 @@ class _ShelfTabState extends State<ShelfTab> {
 
 class _ShelfItem extends StatelessWidget {
   final Book book;
+  final bool showOwner;
   final VoidCallback onTap;
-  const _ShelfItem({required this.book, required this.onTap});
+  const _ShelfItem(
+      {required this.book, required this.onTap, this.showOwner = false});
 
   @override
   Widget build(BuildContext context) {
@@ -265,13 +359,27 @@ class _ShelfItem extends StatelessWidget {
                   final w = math.min(box.maxWidth, box.maxHeight / 1.5);
                   return Align(
                     alignment: Alignment.bottomCenter,
-                    child: Opacity(
-                      // 지금 빌릴 수 없는 책은 살짝 흐리게
-                      opacity: book.isAvailable ? 1 : 0.45,
-                      child: BookCover(
-                          coverUrl: book.coverUrl,
-                          title: book.title,
-                          width: w),
+                    child: SizedBox(
+                      width: w,
+                      height: w * 1.5,
+                      child: Stack(
+                        children: [
+                          Opacity(
+                            // 지금 빌릴 수 없는 책은 흐리게 (배지는 또렷하게 따로 올린다)
+                            opacity: book.isAvailable ? 1 : 0.5,
+                            child: BookCover(
+                                coverUrl: book.coverUrl,
+                                title: book.title,
+                                width: w),
+                          ),
+                          if (!book.isAvailable)
+                            Positioned(
+                              left: 4,
+                              top: 4,
+                              child: BookStatusBadge(status: book.status),
+                            ),
+                        ],
+                      ),
                     ),
                   );
                 },
@@ -282,12 +390,14 @@ class _ShelfItem extends StatelessWidget {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
-            Text(
-              book.isAvailable ? book.ownerName : BookStatus.label(book.status),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 11, color: theme.colorScheme.outline),
-            ),
+            if (showOwner)
+              Text(
+                book.ownerName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style:
+                    TextStyle(fontSize: 11, color: theme.colorScheme.outline),
+              ),
           ],
         ),
     );
@@ -343,6 +453,81 @@ class _ShelfRow extends StatelessWidget {
             ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// 소장자 한 명 (책 수 포함)
+class _OwnerEntry {
+  final String id;
+  final String name;
+  int count = 0;
+  _OwnerEntry(this.id, this.name);
+}
+
+/// 소장자 고르기 시트 — 이름으로 거르고 눌러서 고른다
+class _OwnerPicker extends StatefulWidget {
+  final List<_OwnerEntry> owners;
+  final String? selectedId;
+  const _OwnerPicker({required this.owners, required this.selectedId});
+
+  @override
+  State<_OwnerPicker> createState() => _OwnerPickerState();
+}
+
+class _OwnerPickerState extends State<_OwnerPicker> {
+  String _q = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final q = _q.trim().toLowerCase();
+    final list = widget.owners
+        .where((o) => q.isEmpty || o.name.toLowerCase().contains(q))
+        .toList();
+    return SizedBox(
+      height: MediaQuery.sizeOf(context).height * 0.7,
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: TextField(
+              onChanged: (v) => setState(() => _q = v),
+              decoration: const InputDecoration(
+                hintText: '소장자 이름 검색',
+                prefixIcon: Icon(Icons.search),
+              ),
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.groups_outlined),
+            title: const Text('전체 소장자'),
+            trailing: widget.selectedId == null ? const Icon(Icons.check) : null,
+            onTap: () => Navigator.pop(context, _OwnerEntry('', '')),
+          ),
+          const Divider(height: 1),
+          Expanded(
+            child: list.isEmpty
+                ? Center(
+                    child: Text('찾는 소장자가 없어요.',
+                        style: TextStyle(color: theme.colorScheme.outline)))
+                : ListView.builder(
+                    itemCount: list.length,
+                    itemBuilder: (context, i) {
+                      final o = list[i];
+                      return ListTile(
+                        title: Text(o.name.isEmpty ? '(이름 없음)' : o.name),
+                        subtitle: Text('${o.count}권'),
+                        trailing: o.id == widget.selectedId
+                            ? const Icon(Icons.check)
+                            : null,
+                        onTap: () => Navigator.pop(context, o),
+                      );
+                    },
+                  ),
+          ),
+        ],
       ),
     );
   }

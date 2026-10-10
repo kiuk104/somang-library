@@ -5,6 +5,7 @@ import '../services/account_service.dart';
 import '../services/auth_service.dart';
 import '../widgets/page_frame.dart';
 import '../widgets/push_card.dart';
+import '../widgets/quota_card.dart';
 import '../widgets/rename_dialog.dart';
 import 'admin/invite_screen.dart';
 import 'admin/admin_loans_screen.dart';
@@ -70,6 +71,8 @@ class ProfileTab extends StatelessWidget {
               ),
             ),
 
+            const SizedBox(height: 12),
+            QuotaCard(me: me),
             const SizedBox(height: 12),
             const PushCard(),
 

@@ -16,6 +16,11 @@ class FriendsScreen extends StatefulWidget {
 }
 
 class _FriendsScreenState extends State<FriendsScreen> {
+  /// 앱 테마의 버튼은 가로를 꽉 채우는 최소 크기(52)라서, 목록 줄 끝(trailing)에 두면 글자 칸을 다 잡아먹는다 → 작게 덮어쓴다
+  static final _compactButton = ButtonStyle(
+    minimumSize: WidgetStatePropertyAll(Size(0, 40)),
+  );
+
   late final Stream<List<Friendship>> _stream =
       FriendService.watchMine(widget.me.uid);
   final _searchCtrl = TextEditingController();
@@ -182,6 +187,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 TextButton(
+                                  style: _compactButton,
                                   onPressed: _busy.contains(f.otherId)
                                       ? null
                                       : () => _do(
@@ -191,6 +197,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
                                   child: const Text('거절'),
                                 ),
                                 FilledButton.tonal(
+                                  style: _compactButton,
                                   onPressed: _busy.contains(f.otherId)
                                       ? null
                                       : () => _do(
@@ -250,6 +257,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
                             title: Text(f.otherName),
                             subtitle: const Text('수락을 기다리고 있어요'),
                             trailing: TextButton(
+                              style: _compactButton,
                               onPressed: _busy.contains(f.otherId)
                                   ? null
                                   : () => _do(
@@ -281,6 +289,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
         action = const Text('신청함');
       case FriendRelation.receivedRequest:
         action = FilledButton.tonal(
+          style: _compactButton,
           onPressed: busy
               ? null
               : () => _do(c.uid, () async {
@@ -291,6 +300,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
         );
       case FriendRelation.none:
         action = FilledButton.tonal(
+          style: _compactButton,
           onPressed: busy
               ? null
               : () => _do(c.uid, () => FriendService.request(c.uid),

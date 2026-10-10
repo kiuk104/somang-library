@@ -42,6 +42,10 @@ class LoanService {
   static Future<void> handover(String loanId) =>
       _call({'action': 'handover', 'loanId': loanId});
 
+  /// "주고받았어요"를 잘못 눌렀을 때 — 대여 중 → 주고받기 예정으로 되돌리기
+  static Future<void> undoHandover(String loanId) =>
+      _call({'action': 'undoHandover', 'loanId': loanId});
+
   static Future<void> returnBook(String loanId) =>
       _call({'action': 'return', 'loanId': loanId});
 

@@ -107,6 +107,56 @@ class _GeneratedCover extends StatelessWidget {
   }
 }
 
+/// 책 상태별 색 — 서가 배지·내 책·상세 칩이 같은 색을 쓴다
+/// 대여 가능은 차분한 초록, 신청 중은 노랑, 전달 예정은 파랑, 대여 중은 진한 적갈색, 쉼은 회색
+({Color bg, Color fg}) bookStatusColors(BuildContext context, String status) {
+  final scheme = Theme.of(context).colorScheme;
+  switch (status) {
+    case BookStatus.available:
+      return (bg: scheme.primaryContainer, fg: scheme.onPrimaryContainer);
+    case BookStatus.requested:
+      return (bg: const Color(0xFFFFE1A6), fg: const Color(0xFF5C3B00));
+    case BookStatus.reserved:
+      return (bg: const Color(0xFFCFE3FF), fg: const Color(0xFF0B3A6B));
+    case BookStatus.lent:
+      return (bg: const Color(0xFF8A3F3F), fg: Colors.white);
+    default: // hidden(대여 쉼) 등
+      return (bg: scheme.surfaceContainerHighest, fg: scheme.onSurfaceVariant);
+  }
+}
+
+/// 표지 모서리에 붙이는 작은 상태 배지 (대여 가능이 아닐 때만 쓴다)
+class BookStatusBadge extends StatelessWidget {
+  final String status;
+  final double fontSize;
+  const BookStatusBadge({super.key, required this.status, this.fontSize = 10});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = bookStatusColors(context, status);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+      decoration: BoxDecoration(
+        color: c.bg,
+        borderRadius: BorderRadius.circular(5),
+        boxShadow: const [
+          BoxShadow(color: Color(0x33000000), blurRadius: 3, offset: Offset(0, 1)),
+        ],
+      ),
+      child: Text(
+        BookStatus.label(status),
+        maxLines: 1,
+        style: TextStyle(
+          fontSize: fontSize,
+          fontWeight: FontWeight.w700,
+          color: c.fg,
+          height: 1.1,
+        ),
+      ),
+    );
+  }
+}
+
 /// 상태 표시 칩
 class BookStatusChip extends StatelessWidget {
   final String status;
@@ -114,22 +164,17 @@ class BookStatusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final available = status == BookStatus.available;
+    final c = bookStatusColors(context, status);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: available ? scheme.primaryContainer : scheme.surfaceContainerHighest,
+        color: c.bg,
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
         BookStatus.label(status),
-        style: TextStyle(
-          fontSize: 12,
-          color: available ? scheme.onPrimaryContainer : scheme.onSurfaceVariant,
-        ),
+        style: TextStyle(fontSize: 12, color: c.fg),
       ),
     );
   }
-
 }

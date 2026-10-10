@@ -24,7 +24,9 @@
   <link rel="manifest" href="manifest.json">
 
   <style>
-    html, body { margin: 0; height: 100%; background: #FBF8F1; }
+    html, body { margin: 0; height: 100%; background: #FBF8F1;
+      /* 내용이 화면보다 짧을 때 아래로 끌면 브라우저 새로고침(당겨서 새로고침)이 되는 것을 막는다 */
+      overscroll-behavior: none; }
     #boot {
       position: fixed; inset: 0; display: flex; flex-direction: column;
       align-items: center; justify-content: center; gap: 12px;

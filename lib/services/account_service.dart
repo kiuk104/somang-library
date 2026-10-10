@@ -11,6 +11,14 @@ class AccountService {
       .httpsCallable('renameLibraryUser')
       .call({'name': name, 'uid': ?uid});
 
+  /// 이미 어긋난 이름을 한 번에 맞춘다 (도서관 관리자) → 바뀐 책·대여·친구 기록 수
+  static Future<({int books, int loans, int friendships})> syncNames() async {
+    final res = await _fn.httpsCallable('syncLibraryNames').call();
+    final d = Map<String, dynamic>.from(res.data as Map);
+    int n(String k) => (d[k] as num?)?.toInt() ?? 0;
+    return (books: n('books'), loans: n('loans'), friendships: n('friendships'));
+  }
+
   static String messageFor(Object e) {
     if (e is FirebaseFunctionsException) {
       return e.message ?? '문제가 생겼어요. (${e.code})';

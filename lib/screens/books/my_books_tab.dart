@@ -8,6 +8,7 @@ import '../../widgets/book_cover.dart';
 import '../../widgets/page_frame.dart';
 import 'book_detail_sheet.dart';
 import 'book_form_screen.dart';
+import 'my_book_loans_screen.dart';
 
 /// 내 책 — 내가 등록한 책 목록 + 등록 버튼
 class MyBooksTab extends StatefulWidget {
@@ -33,7 +34,16 @@ class _MyBooksTabState extends State<MyBooksTab> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('내 책')),
+      appBar: AppBar(
+        title: const Text('내 책'),
+        actions: [
+          IconButton(
+            tooltip: '대여 현황',
+            icon: const Icon(Icons.assignment_outlined),
+            onPressed: () => MyBookLoansScreen.open(context, widget.me),
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _openForm,
         icon: const Icon(Icons.add),

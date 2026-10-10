@@ -9,6 +9,7 @@ import '../../services/loan_service.dart';
 import '../../widgets/place_picker.dart';
 import '../../widgets/book_cover.dart';
 import 'book_form_screen.dart';
+import 'book_info_sheet.dart';
 
 /// 책 자세히 보기 (아래에서 올라오는 시트)
 /// - 내 책이면: 대여 가능/쉼 전환, 수정, 삭제
@@ -201,7 +202,13 @@ class _BookDetailState extends State<_BookDetail> {
             Text('ISBN ${book.isbn}',
                 style: TextStyle(color: theme.colorScheme.outline, fontSize: 12)),
           ],
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
+          FilledButton.tonalIcon(
+            onPressed: () => showBookInfo(context, book),
+            icon: const Icon(Icons.menu_book_outlined),
+            label: const Text('책 정보 보기'),
+          ),
+          const SizedBox(height: 12),
 
           if (_mine) ...[
             if (book.isOwnerEditable) ...[
