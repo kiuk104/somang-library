@@ -50,6 +50,30 @@
   </script>
   <!-- 책 바코드 인식 (실시간 스캔 + 사진) — lib/services/photo_barcode.dart 에서 호출 -->
   <script src="scanner.js"></script>
-  <script src="flutter_bootstrap.js" async></script>
+  <!-- flutter_bootstrap.js 대신 직접 부트스트랩: 도움말의 '실험' 에서 고른 렌더링 옵션을
+       localStorage(somang_exp_engine) 에서 읽어 엔진에 넘긴다. (아이폰 강제 종료 원인 분리용) -->
+  <script>
+    {{flutter_js}}
+    {{flutter_build_config}}
+
+    (function () {
+      var config = {};
+      try {
+        var mode = window.localStorage.getItem('somang_exp_engine') || '';
+        if (mode === 'cpu') {
+          config.canvasKitForceCpuOnly = true;
+        } else if (mode === 'multi') {
+          config.canvasKitForceMultiSurfaceRasterizer = true;
+          config.canvasKitMaximumSurfaces = 2;
+        }
+      } catch (e) {}
+      _flutter.loader.load({
+        config: config,
+        serviceWorkerSettings: {
+          serviceWorkerVersion: {{flutter_service_worker_version}}
+        }
+      });
+    })();
+  </script>
 </body>
 </html>

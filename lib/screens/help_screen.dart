@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/library_user.dart';
 import '../widgets/page_frame.dart';
+import '../utils/web_platform.dart';
 import '../widgets/version_badge.dart';
 
 /// 도움말 — 처음 쓰는 교인을 위한 사용법 (항목을 눌러 펼쳐 본다)
@@ -142,6 +143,11 @@ class HelpScreen extends StatelessWidget {
                 ],
               ),
             ),
+            // 아이폰 강제 종료 원인 분리용 실험 스위치 (임시)
+            const Padding(
+              padding: EdgeInsets.only(top: 16),
+              child: _ExperimentCard(),
+            ),
             // 앱 버전 (배포 날짜) — 아이폰 문제 확인 때 어떤 버전인지 알 수 있게
             const Padding(
               padding: EdgeInsets.only(top: 16),
@@ -186,5 +192,68 @@ class _SectionTile extends StatelessWidget {
           ),
       ],
     );
+  }
+}
+
+/// (임시) 아이폰에서 앱이 꺼지는 원인을 나누어 보기 위한 실험 스위치.
+/// 원인이 확인되면 지운다. 값은 localStorage 에 남고, 렌더링 방식은 다시 불러와야 적용된다.
+class _ExperimentCard extends StatefulWidget {
+  const _ExperimentCard();
+
+  @override
+  State<_ExperimentCard> createState() => _ExperimentCardState();
+}
+
+class _ExperimentCardState extends State<_ExperimentCard> {
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final engine = WebPlatform.engineMode;
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ListTile(
+            leading: Icon(Icons.science_outlined, color: theme.colorScheme.primary),
+            title: const Text('실험 (아이폰 꺼짐 원인 찾기)',
+                style: TextStyle(fontWeight: FontWeight.w600)),
+            subtitle: const Text('하나씩 바꿔 가며 서가를 스크롤해 보고, 결과를 알려 주세요.'),
+          ),
+          SwitchListTile(
+            title: const Text('표지 이미지 숨기기'),
+            subtitle: const Text('표지 대신 제목 카드만 보여요'),
+            value: WebPlatform.noCovers,
+            onChanged: (v) => setState(() => WebPlatform.noCovers = v),
+          ),
+          const Divider(height: 1),
+          RadioListTile<String>(
+            title: const Text('렌더링: 기본'),
+            value: '',
+            groupValue: engine,
+            onChanged: _setEngine,
+          ),
+          RadioListTile<String>(
+            title: const Text('렌더링: CPU 전용'),
+            subtitle: const Text('그래픽(WebGL) 메모리를 쓰지 않아요 — 조금 느릴 수 있어요'),
+            value: 'cpu',
+            groupValue: engine,
+            onChanged: _setEngine,
+          ),
+          RadioListTile<String>(
+            title: const Text('렌더링: 다중 서피스(상한 2)'),
+            value: 'multi',
+            groupValue: engine,
+            onChanged: _setEngine,
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _setEngine(String? v) {
+    if (v == null) return;
+    WebPlatform.engineMode = v;
+    WebPlatform.reload(); // 엔진 옵션은 시작할 때만 읽으므로 다시 불러온다
   }
 }

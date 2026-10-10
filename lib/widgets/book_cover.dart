@@ -39,7 +39,7 @@ class BookCover extends StatelessWidget {
       child: SizedBox(
         width: width,
         height: height,
-        child: coverUrl.isEmpty
+        child: coverUrl.isEmpty || WebPlatform.noCovers
             ? placeholder
             : Image.network(
                 coverUrl,
