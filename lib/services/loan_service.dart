@@ -42,12 +42,58 @@ class LoanService {
   static Future<void> handover(String loanId) =>
       _call({'action': 'handover', 'loanId': loanId});
 
+  /// 이미 신청·대여 중인 책 대기 신청 / 취소 (책이 나오면 알림)
+  static Future<void> wait(String bookId) =>
+      _call({'action': 'wait', 'bookId': bookId});
+
+  static Future<void> unwait(String bookId) =>
+      _call({'action': 'unwait', 'bookId': bookId});
+
+  static List<WaitEntry> _waitList(QuerySnapshot<Map<String, dynamic>> s) {
+    final list = s.docs.map(WaitEntry.fromDoc).toList();
+    list.sort((a, b) {
+      final at = a.createdAt, bt = b.createdAt;
+      if (at == null && bt == null) return 0;
+      if (at == null) return 1;
+      if (bt == null) return -1;
+      return at.compareTo(bt); // 먼저 기다린 순
+    });
+    return list;
+  }
+
+  /// 내가 기다리는 책
+  static Stream<List<WaitEntry>> watchMyWaits(String uid) =>
+      FirebaseFirestore.instance
+          .collection('library_waitlist')
+          .where('userId', isEqualTo: uid)
+          .limit(50)
+          .snapshots()
+          .map(_waitList);
+
+  /// 내 책을 기다리는 사람들
+  static Stream<List<WaitEntry>> watchWaitsOnMyBooks(String uid) =>
+      FirebaseFirestore.instance
+          .collection('library_waitlist')
+          .where('ownerId', isEqualTo: uid)
+          .limit(200)
+          .snapshots()
+          .map(_waitList);
+
   /// "주고받았어요"를 잘못 눌렀을 때 — 대여 중 → 주고받기 예정으로 되돌리기
   static Future<void> undoHandover(String loanId) =>
       _call({'action': 'undoHandover', 'loanId': loanId});
 
+  /// 반납 완료 — 소장자, 또는 도서관 관리자가 대신
   static Future<void> returnBook(String loanId) =>
       _call({'action': 'return', 'loanId': loanId});
+
+  /// 빌린 사람: "반납했어요" — 소장자에게 확인 요청 (확인 전까지는 대여 중)
+  static Future<void> reportReturn(String loanId) =>
+      _call({'action': 'reportReturn', 'loanId': loanId});
+
+  /// 소장자: "아직 못 받았어요" — 반납 알림을 되돌린다
+  static Future<void> denyReturn(String loanId) =>
+      _call({'action': 'denyReturn', 'loanId': loanId});
 
   /// 일정·장소 변경 — 보낸 항목만 바뀐다
   /// 수락 후: handoverDate, handoverTime, handoverPlace, returnPlace

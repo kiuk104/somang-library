@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 
 import '../models/book.dart';
 
@@ -30,12 +31,14 @@ class BookService {
     return list;
   }
 
-  static Future<void> add(Book book) {
-    return _books.add({
+  /// 새 책 등록 → 만들어진 책 문서 ID
+  static Future<String> add(Book book) async {
+    final ref = await _books.add({
       ...book.toFields(),
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
     });
+    return ref.id;
   }
 
   static Future<void> update(Book book) {
@@ -54,4 +57,33 @@ class BookService {
   }
 
   static Future<void> delete(String bookId) => _books.doc(bookId).delete();
+
+  // ── 기증
+  /// "기증하기" 켜기·끄기 — 켜 둔 책은 신청하면 대여가 아니라 기증 절차로 진행된다.
+  /// 켤 때는 신청을 받을 수 있게 대여 가능 상태로 함께 바꾼다.
+  static Future<void> setGiveaway(String bookId, bool on) {
+    return _books.doc(bookId).update({
+      'giveaway': on,
+      if (on) 'status': BookStatus.available,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  static FirebaseFunctions get _fn =>
+      FirebaseFunctions.instanceFor(region: 'europe-west1');
+
+  /// 기증 되돌리기 (도서관 관리자) → 다시 소장자가 된 사람 이름
+  static Future<String> revertDonation(String bookId) async {
+    final res = await _fn
+        .httpsCallable('donateBook')
+        .call({'action': 'revert', 'bookId': bookId});
+    return (res.data as Map)['ownerName']?.toString() ?? '';
+  }
+
+  static String messageFor(Object e) {
+    if (e is FirebaseFunctionsException) {
+      return e.message ?? '문제가 생겼어요. (${e.code})';
+    }
+    return '문제가 생겼어요. ($e)';
+  }
 }

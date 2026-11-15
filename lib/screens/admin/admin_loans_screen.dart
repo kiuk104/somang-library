@@ -2,12 +2,14 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../../models/loan.dart';
+import '../../services/loan_service.dart';
 import '../../widgets/book_cover.dart';
 import '../../widgets/page_frame.dart';
 
 /// 전체 대여 현황 (도서관 관리자 전용)
 /// 규칙: 관리자(스태프·담당자)는 모든 loans 를 읽을 수 있다. 쓰기는 loanAction 함수만.
-/// 반납일이 지난 건 → 진행 중 → 지난 기록 순으로 보여 준다.
+/// 반납 확인 대기 → 반납일이 지난 건 → 진행 중 → 지난 기록 순으로 보여 준다.
+/// 대여 중인 건을 누르면 관리자가 대신 반납 완료 처리할 수 있다 (loanAction return).
 class AdminLoansScreen extends StatefulWidget {
   const AdminLoansScreen({super.key});
 
@@ -26,6 +28,40 @@ class _AdminLoansScreenState extends State<AdminLoansScreen> {
 
   final _searchCtrl = TextEditingController();
   String _query = '';
+  final Set<String> _busy = {}; // 처리 중인 대여 건 (연타 방지)
+
+  /// 대여 중인 건을 관리자가 대신 반납 완료 처리
+  Future<void> _forceReturn(Loan l) async {
+    if (_busy.contains(l.id)) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('반납 완료 처리'),
+        content: Text(
+            '「${l.bookTitle}」\n${l.ownerName} → ${l.borrowerName}\n\n'
+            '책이 ${l.ownerName}님에게 돌아간 것이 확실한가요?\n'
+            '완료하면 책이 다시 서가에 올라가고, 두 분에게 알림이 가요. 되돌릴 수 없어요.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('닫기')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('반납 완료')),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    setState(() => _busy.add(l.id));
+    try {
+      await LoanService.returnBook(l.id);
+      if (mounted) showSnack(context, '반납 완료로 처리했어요.');
+    } catch (e) {
+      if (mounted) showSnack(context, LoanService.messageFor(e));
+    } finally {
+      if (mounted) setState(() => _busy.remove(l.id));
+    }
+  }
 
   @override
   void dispose() {
@@ -54,6 +90,10 @@ class _AdminLoansScreenState extends State<AdminLoansScreen> {
         return '주고받기 ${Loan.koWhen(l.handoverDate, l.handoverTime)}'
             '${l.handoverPlace.isEmpty ? '' : ' · ${l.handoverPlace}'}';
       case LoanStatus.lent:
+        if (l.returnReported) {
+          final d = _daysSince(l.returnReportedAt);
+          return '빌린 사람이 반납했다고 알림 · ${d > 0 ? '$d일째' : '오늘'} 소장자 확인 없음';
+        }
         final base = '반납 ${Loan.koWhen(l.dueDate, l.returnTime)}'
             '${l.returnPlace.isEmpty ? '' : ' · ${l.returnPlace}'}';
         return l.isOverdue ? '$base · ${_daysOver(l)}일 지남' : base;
@@ -77,12 +117,21 @@ class _AdminLoansScreenState extends State<AdminLoansScreen> {
         overflow: TextOverflow.ellipsis,
       ),
       isThreeLine: true,
-      trailing: Text(LoanStatus.label(l.status),
-          style: TextStyle(
-              fontSize: 12,
-              color: overdue
-                  ? theme.colorScheme.error
-                  : theme.colorScheme.outline)),
+      // 대여 중인 건만 누를 수 있다 → 대신 반납 완료
+      onTap: l.status == LoanStatus.lent ? () => _forceReturn(l) : null,
+      trailing: _busy.contains(l.id)
+          ? const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2.5))
+          : Text(l.returnReported ? '확인 대기' : LoanStatus.label(l.status),
+              style: TextStyle(
+                  fontSize: 12,
+                  color: overdue
+                      ? theme.colorScheme.error
+                      : l.returnReported
+                          ? theme.colorScheme.primary
+                          : theme.colorScheme.outline)),
     );
   }
 
@@ -142,7 +191,13 @@ class _AdminLoansScreenState extends State<AdminLoansScreen> {
                   LoanStatus.accepted => 1,
                   _ => 2,
                 };
-            final active = all.where((l) => l.isActive && !l.isOverdue).toList()
+            // 빌린 사람은 반납했다는데 소장자 확인이 없는 건 (오래된 순)
+            final waiting = all.where((l) => l.returnReported).toList()
+              ..sort((a, b) =>
+                  a.returnReportedAt!.compareTo(b.returnReportedAt!));
+            final active = all
+                .where((l) => l.isActive && !l.isOverdue && !l.returnReported)
+                .toList()
               ..sort((a, b) {
                 final o = order(a).compareTo(order(b));
                 if (o != 0) return o;
@@ -186,6 +241,16 @@ class _AdminLoansScreenState extends State<AdminLoansScreen> {
                           ),
                   ),
                 ),
+                if (waiting.isNotEmpty || overdue.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: Text('대여 중인 책을 누르면 대신 반납 완료 처리할 수 있어요.',
+                        style: TextStyle(
+                            fontSize: 12, color: theme.colorScheme.outline)),
+                  ),
+                if (waiting.isNotEmpty)
+                  _section('반납 확인 대기 (${waiting.length})',
+                      [for (final l in waiting) _tile(l)]),
                 if (overdue.isNotEmpty)
                   _section('반납 지난 건 (${overdue.length})',
                       [for (final l in overdue) _tile(l, overdue: true)]),

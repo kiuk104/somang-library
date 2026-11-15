@@ -29,7 +29,7 @@
 - 필드: ownerId, ownerName(복사), title, author, publisher, isbn, coverUrl, note, status, createdAt, updatedAt
 - 문자열 필드는 null 금지(빈 문자열) — 규칙 `isValidBook`
 - status: `available`·`hidden` 은 소장자가, `requested`·`lent` 는 대여 함수가 바꾼다 (진행 중엔 소장자 수정·삭제 불가)
-- 책 정보 검색: `BookLookupService` (카카오 lookupBook 함수 → Google Books → Open Library)
+- 책 정보 검색: `BookLookupService` (카카오 lookupBook 함수 → Google Books → DNB(lookupBook `source: dnb`) → Open Library)
 - 바코드: `web/scanner.js` (zxing-wasm, `web/zxing` 자체 호스팅) — Dart 는 `PhotoBarcode`
   - 실시간 `somangScanLive()`: 후면 메인 카메라(`camera2 0`) 선택 + 연속 자동초점 + 1080p, 가운데 띠를 잘라 인식
   - 사진 `somangReadBarcodes(blob)`: `image_picker` 로 찍은 사진
@@ -38,12 +38,26 @@
 
 ## 대여 (loans)
 - 상태 변경은 전부 Cloud Function `loanAction` (mustardseed, europe-west1): request → accept(장소 확정) → handover → return, reject·cancel·setReturnPlace
+- 반납 확인: 빌린 사람 `reportReturn`("반납했어요", `returnReportedAt` 기록·상태는 lent) → 소장자 `return` 또는 `denyReturn`. 확인이 없으면 토요일 알림이 관리자에게 알리고 7일 뒤 자동 완료. 관리자는 전체 대여 현황에서 `return` 을 대신 할 수 있다
 - 장소 선택지: `LoanPlaces.presets` (게마인데잘 / 대여 서재 / 대예배실 앞) + 직접 입력
 - 날짜는 'YYYY-MM-DD' 주일 문자열 (handoverDate, dueDate=4주 뒤 주일)
 - 대여 목록·알림함 구독은 `HomeShell` 한 곳에서 (탭 배지 공용)
 - 알림함 `library_notifications`, 웹 푸시 토큰 `users/{uid}/libraryTokens/{token}`
 - 웹 푸시: `PushService.vapidKey` (콘솔 웹 푸시 인증서 공개 키) 필요, `web/firebase-messaging-sw.js`
   로그아웃 시 토큰 삭제 (`AuthService.signOut` → `PushService.forget`)
+
+## 책 기증 (대여와 같은 절차로 소유권 이전)
+- 내 책 상세의 "기증하기" → `books.giveaway: true` (소장자가 직접 켜고 끔, `BookService.setGiveaway`). 서가에 선물 배지·"기증 책만" 필터
+- 기증 책을 신청하면 `loanAction` 이 `loans.gift: true` 로 만든다 → 수락 → 주일에 주고받기. **handover 에서 대여 중(lent)이 되는 대신 `loans.status = 'given'`**, `books.ownerId`·`ownerName` 이 받은 사람으로 바뀌고 `donatedById`·`donatedByName`·`donatedAt` 기록, 책은 `hidden`(대여 쉼)으로 시작
+- 소유자와 donated* 필드는 규칙상 클라이언트가 못 쓴다 (함수 전용). `giveaway` 는 bool 만
+- 되돌리기는 도서관 관리자만 (책 상세의 "기증 되돌리기", 함수 `donateBook` action `revert`) — 기증한 사람에게 돌아간다
+- 화면 문구는 `Loan.gift`·`Book.giveaway` 로 분기 (`loans_tab.dart`, `place_picker.dart`, `book_detail_sheet.dart`)
+
+## 희망 도서 (library_wishes)
+- 서가에 없는 책을 "읽고 싶어요"로 올려 두는 목록. 읽기는 도서관 사용자 전원, **쓰기는 전부 Cloud Function `wishAction`** (mustardseed, europe-west1): create · delete · vote/unvote("저도 읽고 싶어요") · fulfill("저 있어요")
+- "저 있어요" → `BookFormScreen(forWish:)` 로 책 등록 → `WishService.fulfill(wishId, bookId)` → 희망한 사람·공감한 사람에게 알림(`wish_fulfilled`)
+- 같은 ISBN 의 희망이 이미 있으면 새로 만들지 않고 공감만 더한다. 이미 서가에 있는 ISBN 은 거절. 한 사람 10권(`WISH_MAX_OPEN` = `WishService.maxOpen`)
+- 화면: `wishes/wishes_screen.dart`(목록) · `wishes/wish_form_screen.dart`(올리기). 진입: 서가의 "희망 도서" 버튼 / 서가 검색 결과가 없을 때 버튼
 
 ## 화면 흐름
 `AuthGate` → 로그인 안 함: `LoginScreen` / users 문서 없음: `JoinScreen` / 미승인 교인: `PendingScreen` / 그 외: `HomeShell`

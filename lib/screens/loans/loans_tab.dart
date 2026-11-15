@@ -17,6 +17,7 @@ class LoansTab extends StatefulWidget {
   final List<Loan>? loans; // null: 불러오는 중
   final Object? loansError;
   final List<LibraryNotice> notices;
+  final List<WaitEntry> waits; // 내가 기다리는 책
 
   const LoansTab({
     super.key,
@@ -24,6 +25,7 @@ class LoansTab extends StatefulWidget {
     required this.loans,
     required this.loansError,
     required this.notices,
+    this.waits = const [],
   });
 
   @override
@@ -73,7 +75,8 @@ class _LoansTabState extends State<LoansTab> {
     await _run(l,
         () => LoanService.accept(l.id,
             handoverPlace: places.handover, returnPlace: places.ret),
-        done: '수락했어요. 다가오는 주일에 ${places.handover}에서 건네주세요.');
+        done: '수락했어요. 다가오는 주일에 ${places.handover}에서 건네주세요.'
+            '${l.gift ? ' 건네주면 기증이 끝나요.' : ''}');
   }
 
   Future<void> _reject(Loan l) async {
@@ -84,7 +87,9 @@ class _LoansTabState extends State<LoansTab> {
   }
 
   Future<void> _cancel(Loan l) async {
-    if (!await _confirm('대여 취소', '「${l.bookTitle}」 대여를 취소할까요?', '취소하기')) {
+    final kind = l.gift ? '기증' : '대여';
+    if (!await _confirm(
+        '$kind 취소', '「${l.bookTitle}」 $kind${l.gift ? '을' : '를'} 취소할까요?', '취소하기')) {
       return;
     }
     await _run(l, () => LoanService.cancel(l.id), done: '취소했어요.');
@@ -92,16 +97,20 @@ class _LoansTabState extends State<LoansTab> {
 
   Future<void> _handover(Loan l) async {
     final owner = l.isOwner(_uid);
-    if (!await _confirm(
-        '주고받았어요',
-        owner
-            ? '${l.borrowerName}님에게 「${l.bookTitle}」을(를) 건네줬나요?\n실제로 건네준 뒤에 눌러 주세요.'
-            : '${l.ownerName}님에게 「${l.bookTitle}」을(를) 받았나요?\n책을 실제로 받은 뒤에 눌러 주세요.',
-        '네, 완료')) {
+    final ask = owner
+        ? '${l.borrowerName}님에게 「${l.bookTitle}」을(를) 건네줬나요?\n실제로 건네준 뒤에 눌러 주세요.'
+        : '${l.ownerName}님에게 「${l.bookTitle}」을(를) 받았나요?\n책을 실제로 받은 뒤에 눌러 주세요.';
+    final giftNote =
+        l.gift ? '\n\n기증이라서 누르면 바로 ${l.borrowerName}님의 책이 돼요.' : '';
+    if (!await _confirm('주고받았어요', '$ask$giftNote', '네, 완료')) {
       return;
     }
     await _run(l, () => LoanService.handover(l.id),
-        done: '대여가 시작됐어요. 반납일은 4주 뒤 주일이에요.');
+        done: l.gift
+            ? (owner
+                ? '기증이 끝났어요. 이제 ${l.borrowerName}님의 책이에요. 감사합니다!'
+                : '기증받았어요! 이제 "내 책"에 있어요. (대여 쉼 상태 — 빌려주려면 책에서 "다시 빌려주기")')
+            : '대여가 시작됐어요. 반납일은 4주 뒤 주일이에요.');
   }
 
   /// 주고받았어요를 잘못 눌렀을 때 → 주고받기 예정 상태로 되돌린다
@@ -116,6 +125,18 @@ class _LoansTabState extends State<LoansTab> {
         done: '되돌렸어요. 다시 "주고받기 예정"이에요.');
   }
 
+  Future<void> _unwait(WaitEntry w) async {
+    if (!await _confirm('대기 취소', '「${w.bookTitle}」 대기를 취소할까요?', '대기 취소')) {
+      return;
+    }
+    try {
+      await LoanService.unwait(w.bookId);
+      if (mounted) showSnack(context, '대기를 취소했어요.');
+    } catch (e) {
+      if (mounted) showSnack(context, LoanService.messageFor(e));
+    }
+  }
+
   Future<void> _return(Loan l) async {
     if (!await _confirm('반납 확인',
         '${l.borrowerName}님에게 「${l.bookTitle}」을(를) 돌려받았나요?', '네, 받았어요')) {
@@ -123,6 +144,31 @@ class _LoansTabState extends State<LoansTab> {
     }
     await _run(l, () => LoanService.returnBook(l.id),
         done: '반납 완료! 책이 다시 서가에 올라갔어요.');
+  }
+
+  /// 빌린 사람: 책을 돌려줬다고 알리기 (소장자가 확인하면 반납 완료)
+  Future<void> _reportReturn(Loan l) async {
+    if (!await _confirm(
+        '반납했어요',
+        '「${l.bookTitle}」을(를) ${l.ownerName}님께 돌려드렸나요?\n'
+            '${l.ownerName}님에게 확인 알림을 보내요. 확인이 없으면 일주일쯤 뒤 자동으로 반납 완료돼요.',
+        '네, 반납했어요')) {
+      return;
+    }
+    await _run(l, () => LoanService.reportReturn(l.id),
+        done: '${l.ownerName}님에게 확인을 부탁했어요.');
+  }
+
+  /// 소장자: 반납했다는 알림을 받았지만 아직 책을 못 받았을 때
+  Future<void> _denyReturn(Loan l) async {
+    if (!await _confirm(
+        '아직 못 받았어요',
+        '「${l.bookTitle}」을(를) 아직 돌려받지 못했나요?\n${l.borrowerName}님에게 알려 드려요.',
+        '못 받았어요')) {
+      return;
+    }
+    await _run(l, () => LoanService.denyReturn(l.id),
+        done: '${l.borrowerName}님에게 알렸어요.');
   }
 
   Future<void> _reschedule(Loan l) async {
@@ -179,8 +225,11 @@ class _LoansTabState extends State<LoansTab> {
     final sunday = loans.where((l) => l.status == LoanStatus.accepted).toList();
     final borrowed =
         loans.where((l) => !mine(l) && l.status == LoanStatus.lent).toList();
+    // 빌려준 책 — 반납 확인을 기다리는 건이 맨 위로
     final lentOut =
-        loans.where((l) => mine(l) && l.status == LoanStatus.lent).toList();
+        loans.where((l) => mine(l) && l.status == LoanStatus.lent).toList()
+          ..sort((a, b) =>
+              (a.returnReported ? 0 : 1).compareTo(b.returnReported ? 0 : 1));
     final past = loans.where((l) => !l.isActive).take(30).toList();
 
     final sections = <Widget>[
@@ -200,7 +249,9 @@ class _LoansTabState extends State<LoansTab> {
           _LoanCard(
             loan: l,
             lines: [
-              '${l.borrowerName}님이 빌리고 싶어 해요',
+              l.gift
+                  ? '🎁 기증 신청 · ${l.borrowerName}님이 받고 싶어 해요'
+                  : '${l.borrowerName}님이 빌리고 싶어 해요',
               if (l.handoverPlace.isNotEmpty) '희망 장소: ${l.handoverPlace}',
               if (l.message.isNotEmpty) '"${l.message}"',
             ],
@@ -217,12 +268,15 @@ class _LoansTabState extends State<LoansTab> {
           _LoanCard(
             loan: l,
             lines: [
+              if (l.gift) '🎁 기증 · 주고받으면 ${l.borrowerName}님의 책이 돼요',
               mine(l)
                   ? '${l.borrowerName}님에게 건네주기'
                   : '${l.ownerName}님에게 받기',
               '📅 ${Loan.koWhen(l.handoverDate, l.handoverTime)}',
               '📍 ${l.handoverPlace}',
-              if (l.returnPlace.isNotEmpty && l.returnPlace != l.handoverPlace)
+              if (!l.gift &&
+                  l.returnPlace.isNotEmpty &&
+                  l.returnPlace != l.handoverPlace)
                 '반납은 ${l.returnPlace}',
             ],
             busy: _busy.contains(l.id),
@@ -238,7 +292,10 @@ class _LoansTabState extends State<LoansTab> {
         for (final l in myRequests)
           _LoanCard(
             loan: l,
-            lines: ['${l.ownerName}님의 응답을 기다리는 중'],
+            lines: [
+              if (l.gift) '🎁 기증 신청',
+              '${l.ownerName}님의 응답을 기다리는 중',
+            ],
             busy: _busy.contains(l.id),
             actions: [_Act('신청 취소', () => _cancel(l))],
           ),
@@ -251,14 +308,22 @@ class _LoansTabState extends State<LoansTab> {
             warn: l.isOverdue,
             lines: [
               '${l.ownerName}님의 책',
-              '${l.isOverdue ? '⚠️ 반납일 지남' : '반납일'}: ${Loan.koWhen(l.dueDate, l.returnTime)}',
-              '📍 반납 장소: ${l.returnPlace.isEmpty ? '정해지지 않음' : l.returnPlace}',
+              if (l.returnReported) ...[
+                '📗 반납했다고 알렸어요 (${Loan.koDate(Loan.ymdOf(l.returnReportedAt!))})',
+                '${l.ownerName}님의 확인을 기다리는 중이에요',
+              ] else ...[
+                '${l.isOverdue ? '⚠️ 반납일 지남' : '반납일'}: ${Loan.koWhen(l.dueDate, l.returnTime)}',
+                '📍 반납 장소: ${l.returnPlace.isEmpty ? '정해지지 않음' : l.returnPlace}',
+              ],
             ],
             busy: _busy.contains(l.id),
-            actions: [
-              _Act('아직 못 받았어요', () => _undoHandover(l)),
-              _Act('반납 일정·장소 변경', () => _reschedule(l)),
-            ],
+            actions: l.returnReported
+                ? const []
+                : [
+                    _Act('아직 못 받았어요', () => _undoHandover(l)),
+                    _Act('반납 일정·장소 변경', () => _reschedule(l)),
+                    _Act('반납했어요', () => _reportReturn(l), primary: true),
+                  ],
           ),
       ],
       if (lentOut.isNotEmpty) ...[
@@ -268,16 +333,48 @@ class _LoansTabState extends State<LoansTab> {
             loan: l,
             warn: l.isOverdue,
             lines: [
-              '${l.borrowerName}님이 읽는 중',
-              '${l.isOverdue ? '⚠️ 반납일 지남' : '반납일'}: ${Loan.koWhen(l.dueDate, l.returnTime)}',
+              if (l.returnReported) ...[
+                '📗 ${l.borrowerName}님이 반납했다고 알렸어요 (${Loan.koDate(Loan.ymdOf(l.returnReportedAt!))})',
+                '책을 받으셨는지 확인해 주세요',
+              ] else ...[
+                '${l.borrowerName}님이 읽는 중',
+                '${l.isOverdue ? '⚠️ 반납일 지남' : '반납일'}: ${Loan.koWhen(l.dueDate, l.returnTime)}',
+                if (l.isOverdue) '이미 돌려받으셨다면 "돌려받았어요"를 눌러 주세요',
+              ],
               '📍 반납 장소: ${l.returnPlace.isEmpty ? '정해지지 않음' : l.returnPlace}',
             ],
             busy: _busy.contains(l.id),
-            actions: [
-              _Act('주고받기 되돌리기', () => _undoHandover(l)),
-              _Act('일정 변경', () => _reschedule(l)),
-              _Act('돌려받았어요', () => _return(l), primary: true),
-            ],
+            actions: l.returnReported
+                ? [
+                    _Act('아직 못 받았어요', () => _denyReturn(l)),
+                    _Act('돌려받았어요', () => _return(l), primary: true),
+                  ]
+                : [
+                    _Act('주고받기 되돌리기', () => _undoHandover(l)),
+                    _Act('일정 변경', () => _reschedule(l)),
+                    _Act('돌려받았어요', () => _return(l), primary: true),
+                  ],
+          ),
+      ],
+      if (widget.waits.isNotEmpty) ...[
+        _header('기다리는 책', widget.waits.length),
+        for (final w in widget.waits)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Card(
+              child: ListTile(
+                leading: BookCover(
+                    coverUrl: w.bookCover, title: w.bookTitle, width: 36),
+                title: Text(w.bookTitle,
+                    maxLines: 2, overflow: TextOverflow.ellipsis),
+                subtitle: Text(
+                    '${w.ownerName}님의 책 · 나오면 알려 드려요'),
+                trailing: TextButton(
+                  onPressed: () => _unwait(w),
+                  child: const Text('취소'),
+                ),
+              ),
+            ),
           ),
       ],
       if (incoming.isEmpty &&

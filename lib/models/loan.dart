@@ -6,6 +6,7 @@ class LoanStatus {
   static const accepted = 'accepted'; // 수락 → 주일에 주고받기
   static const lent = 'lent'; // 빌려 간 상태
   static const returned = 'returned';
+  static const given = 'given'; // 기증 완료 — 책이 받은 사람의 것이 됨
   static const rejected = 'rejected';
   static const canceled = 'canceled';
 
@@ -19,6 +20,8 @@ class LoanStatus {
         return '대여 중';
       case returned:
         return '반납 완료';
+      case given:
+        return '기증 완료';
       case rejected:
         return '거절됨';
       case canceled:
@@ -57,8 +60,11 @@ class LoanQuota {
         overdueTitle ??= l.bookTitle;
         continue;
       }
-      final r = l.returnedAt;
-      if (l.status == LoanStatus.returned && r != null) {
+      // "반납했어요"를 누른 날이 있으면 그날을 반납한 날로 본다 (서버와 같은 계산)
+      final r = l.returnReportedAt ??
+          (l.status == LoanStatus.returned ? l.returnedAt : null);
+      if ((l.status == LoanStatus.returned || l.status == LoanStatus.lent) &&
+          r != null) {
         final ret = Loan.ymdOf(r);
         if (ret.compareTo(l.dueDate) > 0) {
           final late =
@@ -111,6 +117,8 @@ class Loan {
   final DateTime? requestedAt;
   final DateTime? updatedAt;
   final DateTime? returnedAt; // 반납 완료 시각 (연체 페널티 계산용)
+  final DateTime? returnReportedAt; // 빌린 사람이 "반납했어요"를 누른 시각 (소장자 확인 전)
+  final bool gift; // 기증 건 — 절차는 대여와 같고, 주고받으면 책이 받은 사람의 것이 된다
 
   const Loan({
     required this.id,
@@ -132,7 +140,13 @@ class Loan {
     this.requestedAt,
     this.updatedAt,
     this.returnedAt,
+    this.returnReportedAt,
+    this.gift = false,
   });
+
+  /// 빌린 사람은 반납했다고 알렸는데 소장자가 아직 확인하지 않은 상태
+  bool get returnReported =>
+      status == LoanStatus.lent && returnReportedAt != null;
 
   bool get isActive =>
       status == LoanStatus.requested ||
@@ -141,9 +155,10 @@ class Loan {
 
   bool isOwner(String uid) => ownerId == uid;
 
-  /// 반납일이 지났는지 (오늘 날짜 문자열과 비교)
+  /// 반납일이 지났는지 (오늘 날짜 문자열과 비교) — 반납했다고 알린 건은 연체로 보지 않는다
   bool get isOverdue =>
       status == LoanStatus.lent &&
+      returnReportedAt == null &&
       dueDate.isNotEmpty &&
       dueDate.compareTo(todayYmd()) < 0;
 
@@ -193,6 +208,8 @@ class Loan {
       requestedAt: t('requestedAt'),
       updatedAt: t('updatedAt'),
       returnedAt: t('returnedAt'),
+      returnReportedAt: t('returnReportedAt'),
+      gift: d['gift'] == true,
     );
   }
 }
@@ -230,6 +247,49 @@ class LibraryNotice {
       type: d['type']?.toString() ?? '',
       fromId: d['fromId']?.toString() ?? '',
       read: d['read'] == true,
+      createdAt: c is Timestamp ? c.toDate() : null,
+    );
+  }
+}
+
+/// 대기 신청 (library_waitlist) — 이미 신청·대여 중인 책이 나오면 알림을 받는다
+/// 만들기·지우기는 loanAction(wait/unwait/request) 함수만 한다.
+class WaitEntry {
+  final String id;
+  final String bookId;
+  final String bookTitle;
+  final String bookCover;
+  final String ownerId;
+  final String ownerName;
+  final String userId;
+  final String userName;
+  final DateTime? createdAt;
+
+  const WaitEntry({
+    required this.id,
+    required this.bookId,
+    required this.bookTitle,
+    required this.bookCover,
+    required this.ownerId,
+    required this.ownerName,
+    required this.userId,
+    required this.userName,
+    this.createdAt,
+  });
+
+  factory WaitEntry.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
+    final d = doc.data() ?? const {};
+    String s(String k) => d[k]?.toString() ?? '';
+    final c = d['createdAt'];
+    return WaitEntry(
+      id: doc.id,
+      bookId: s('bookId'),
+      bookTitle: s('bookTitle'),
+      bookCover: s('bookCover'),
+      ownerId: s('ownerId'),
+      ownerName: s('ownerName'),
+      userId: s('userId'),
+      userName: s('userName'),
       createdAt: c is Timestamp ? c.toDate() : null,
     );
   }

@@ -7,26 +7,17 @@ import '../../widgets/book_cover.dart';
 
 /// 책 정보 — 앱 안에서 보는 상세 정보 (출판사·출간일·쪽수·정가·책 소개)
 /// 카카오 책 검색 + Google Books 에서 가져온다. 못 찾으면 알라딘 검색 링크를 안내한다.
-Future<void> showBookInfo(BuildContext context, Book book) {
-  return showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    showDragHandle: true,
-    useSafeArea: true,
-    constraints: const BoxConstraints(maxWidth: 560),
-    builder: (_) => _BookInfoSheet(book: book),
-  );
-}
-
-class _BookInfoSheet extends StatefulWidget {
+/// 책 상세 시트 "안에서" 화면만 바뀌어 보이는 내용 부분 (자체 모달 없음)
+class BookInfoView extends StatefulWidget {
   final Book book;
-  const _BookInfoSheet({required this.book});
+  final VoidCallback onBack;
+  const BookInfoView({super.key, required this.book, required this.onBack});
 
   @override
-  State<_BookInfoSheet> createState() => _BookInfoSheetState();
+  State<BookInfoView> createState() => _BookInfoViewState();
 }
 
-class _BookInfoSheetState extends State<_BookInfoSheet> {
+class _BookInfoViewState extends State<BookInfoView> {
   late final Future<BookInfo?> _future = BookLookupService.details(
     isbn: widget.book.isbn,
     title: widget.book.title,
@@ -98,11 +89,21 @@ class _BookInfoSheetState extends State<_BookInfoSheet> {
         ];
         final desc = info?.description ?? '';
 
-        return SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(24, 0, 24, 28),
-          child: Column(
+        return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: widget.onBack,
+                  style: TextButton.styleFrom(
+                      minimumSize: const Size(0, 40),
+                      padding: const EdgeInsets.symmetric(horizontal: 8)),
+                  icon: const Icon(Icons.arrow_back, size: 18),
+                  label: const Text('돌아가기'),
+                ),
+              ),
+              const SizedBox(height: 4),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -173,7 +174,6 @@ class _BookInfoSheetState extends State<_BookInfoSheet> {
                 ),
               ],
             ],
-          ),
         );
       },
     );

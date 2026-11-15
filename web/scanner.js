@@ -1,6 +1,7 @@
 /*
  * 소망 도서관 — 책 바코드(ISBN) 인식
  *  - somangScanLive()        : 실시간 카메라 스캔 (전체화면 오버레이) → ISBN 문자열 또는 null
+ *                              (ISBN 이 없는 잡지형 책은 '4193889712990-04' 같은 잡지 바코드+호수)
  *  - somangReadBarcodes(blob): 사진 한 장에서 바코드 읽기 → 문자열 배열
  * 인식 엔진: zxing-wasm (web/zxing, MIT) — 처음 쓸 때만 불러온다.
  * Dart 쪽: lib/services/photo_barcode.dart
@@ -40,7 +41,9 @@
   async function read(input, opts) {
     await loadZXing();
     var results = await ZXingWASM.readBarcodes(input, Object.assign({
-      formats: FORMATS, tryHarder: true, maxNumberOfSymbols: 4
+      formats: FORMATS, tryHarder: true, maxNumberOfSymbols: 4,
+      // 잡지 바코드 옆의 작은 2자리(호수)·5자리 부가 바코드도 같이 읽는다
+      eanAddOnSymbol: 'Read'
     }, opts || {}));
     return results.filter(function (r) { return r.isValid; }).map(function (r) { return r.text; });
   }
@@ -58,6 +61,29 @@
       }
     }
     return null;
+  }
+
+  function validEan13(s) {
+    var sum = 0;
+    for (var k = 0; k < 12; k++) sum += (+s[k]) * (k % 2 ? 3 : 1);
+    return (10 - sum % 10) % 10 === +s[12];
+  }
+
+  /**
+   * ISBN 이 없는 잡지형 책(가판대용, 예: 미키마우스 LTB) 바코드
+   * 독일 잡지 419·414, 국제 ISSN 977 + 옆의 2자리 호수 → '4193889712990-04' (호수를 못 읽으면 13자리만)
+   * Dart BookLookupService.findPressCode 와 같은 규칙
+   */
+  function pickPress(texts) {
+    var best = null;
+    for (var i = 0; i < texts.length; i++) {
+      var digits = String(texts[i]).replace(/\D/g, '');
+      var m = /^(41[49]\d{10}|977\d{10})(\d{2}|\d{5})?$/.exec(digits);
+      if (!m || !validEan13(m[1])) continue;
+      if (m[2]) return m[1] + '-' + m[2];
+      best = best || m[1];
+    }
+    return best;
   }
 
   window.somangReadBarcodes = function (blob) { return read(blob); };
@@ -134,6 +160,7 @@
     return new Promise(function (resolve) {
       var ui = buildOverlay();
       var stream = null, stopped = false, timer = null, frame = 0, torchOn = false;
+      var pressSeenAt = 0; // 호수 없이 잡지 바코드만 처음 읽힌 시각
       var canvas = document.createElement('canvas');
       var ctx = canvas.getContext('2d', { willReadFrequently: true });
 
@@ -168,6 +195,17 @@
             if (stopped) return;
             if (texts.length) ui.last.textContent = '읽힌 값: ' + texts.join(', ');
             var isbn = pickIsbn(texts);
+            if (!isbn) {
+              // 잡지 바코드: 호수까지 읽히면 바로, 호수가 안 읽히면 2.5초 기다렸다가 본 바코드만
+              var press = pickPress(texts);
+              if (press && press.indexOf('-') > 0) {
+                isbn = press;
+              } else if (press) {
+                if (!pressSeenAt) pressSeenAt = Date.now();
+                ui.last.textContent = '잡지용 바코드예요. 옆의 작은 바코드(호수)까지 화면에 넣어 주세요.';
+                if (Date.now() - pressSeenAt > 2500) isbn = press;
+              }
+            }
             if (isbn) {
               if (navigator.vibrate) navigator.vibrate(60);
               ui.line.style.background = '#4ade80';

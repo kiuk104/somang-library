@@ -29,6 +29,7 @@ class _HomeShellState extends State<HomeShell> {
   List<Loan>? _loans;
   Object? _loansError;
   List<LibraryNotice> _notices = const [];
+  List<WaitEntry> _waits = const [];
   final List<StreamSubscription<dynamic>> _subs = [];
 
   @override
@@ -41,6 +42,10 @@ class _HomeShellState extends State<HomeShell> {
         _loansError = null;
       }),
       onError: (Object e) => setState(() => _loansError = e),
+    ));
+    _subs.add(LoanService.watchMyWaits(uid).listen(
+      (w) => setState(() => _waits = w),
+      onError: (_) {},
     ));
     _subs.add(LoanService.watchNotices(uid).listen(
       (n) => setState(() => _notices = n),
@@ -64,13 +69,14 @@ class _HomeShellState extends State<HomeShell> {
     super.dispose();
   }
 
-  /// 내가 처리해야 할 대여 (받은 신청 + 이번 주일 주고받기)
+  /// 내가 처리해야 할 대여 (받은 신청 + 이번 주일 주고받기 + 반납 확인 요청)
   int get _todo {
     final uid = widget.me.uid;
     return (_loans ?? const <Loan>[])
         .where((l) =>
             (l.status == LoanStatus.requested && l.ownerId == uid) ||
-            l.status == LoanStatus.accepted)
+            l.status == LoanStatus.accepted ||
+            (l.returnReported && l.ownerId == uid))
         .length;
   }
 
@@ -84,6 +90,7 @@ class _HomeShellState extends State<HomeShell> {
         loans: _loans,
         loansError: _loansError,
         notices: _notices,
+        waits: _waits,
       ),
       ProfileTab(me: widget.me),
     ];

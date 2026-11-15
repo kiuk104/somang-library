@@ -9,6 +9,7 @@ import 'app_theme.dart';
 import 'screens/auth_gate.dart';
 import 'services/invite_service.dart';
 import 'utils/web_platform.dart';
+import 'widgets/book_cover.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -43,6 +44,7 @@ class SomangLibraryApp extends StatelessWidget {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
+      navigatorObservers: [CoverOverlay.observer],
       home: const AuthGate(),
     );
   }

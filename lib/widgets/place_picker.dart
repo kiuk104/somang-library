@@ -113,13 +113,13 @@ class _PlacePickerState extends State<PlacePicker> {
 
 /// 대여 신청 창 — (받고 싶은 곳, 메모) 또는 취소 시 null
 Future<({String place, String message})?> showRequestDialog(
-    BuildContext context, String bookTitle) {
+    BuildContext context, String bookTitle, {bool gift = false}) {
   var place = '';
   final msgCtrl = TextEditingController();
   return showDialog<({String place, String message})>(
     context: context,
     builder: (ctx) => AlertDialog(
-      title: Text('「$bookTitle」 빌리기'),
+      title: Text(gift ? '「$bookTitle」 기증받기' : '「$bookTitle」 빌리기'),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -135,12 +135,15 @@ Future<({String place, String message})?> showRequestDialog(
               controller: msgCtrl,
               maxLength: 200,
               maxLines: 2,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: '소장자에게 한마디 (선택)',
-                hintText: '예: 2주 정도 읽고 돌려드릴게요!',
+                hintText: gift ? '예: 아이와 같이 읽고 싶어요!' : '예: 2주 정도 읽고 돌려드릴게요!',
               ),
             ),
-            Text('소장자가 수락하면 다가오는 주일에 주고받아요.',
+            Text(
+                gift
+                    ? '소장자가 수락하면 다가오는 주일에 받아요. 받으면 내 책이 돼요.'
+                    : '소장자가 수락하면 다가오는 주일에 주고받아요.',
                 style: TextStyle(
                     fontSize: 12, color: Theme.of(ctx).colorScheme.outline)),
           ],
@@ -169,13 +172,16 @@ Future<({String handover, String ret})?> showAcceptDialog(
     context: context,
     builder: (ctx) => StatefulBuilder(
       builder: (ctx, setLocal) => AlertDialog(
-        title: const Text('대여 수락'),
+        title: Text(loan.gift ? '기증 수락' : '대여 수락'),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('${loan.borrowerName}님에게 「${loan.bookTitle}」을(를) 빌려줘요.'),
+              Text(loan.gift
+                  ? '${loan.borrowerName}님에게 「${loan.bookTitle}」을(를) 기증해요. '
+                      '주일에 건네주면 ${loan.borrowerName}님의 책이 돼요.'
+                  : '${loan.borrowerName}님에게 「${loan.bookTitle}」을(를) 빌려줘요.'),
               if (loan.message.isNotEmpty) ...[
                 const SizedBox(height: 8),
                 Text('"${loan.message}"',
@@ -187,6 +193,7 @@ Future<({String handover, String ret})?> showAcceptDialog(
                 initial: loan.handoverPlace,
                 onChanged: (v) => handover = v,
               ),
+              if (!loan.gift) // 기증은 반납이 없다
               CheckboxListTile(
                 contentPadding: EdgeInsets.zero,
                 value: sameReturn,
@@ -194,7 +201,7 @@ Future<({String handover, String ret})?> showAcceptDialog(
                 title: const Text('반납도 같은 곳에서'),
                 controlAffinity: ListTileControlAffinity.leading,
               ),
-              if (!sameReturn)
+              if (!sameReturn && !loan.gift)
                 PlacePicker(
                   label: '돌려받을 곳',
                   initial: '',

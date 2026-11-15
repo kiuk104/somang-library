@@ -28,6 +28,7 @@ class MyBookLoansScreen extends StatefulWidget {
 class _MyBookLoansScreenState extends State<MyBookLoansScreen> {
   List<Book>? _books;
   List<Loan>? _loans;
+  List<WaitEntry> _waits = const [];
   Object? _error;
   final List<StreamSubscription<dynamic>> _subs = [];
 
@@ -40,6 +41,10 @@ class _MyBookLoansScreenState extends State<MyBookLoansScreen> {
         _books = BookService.sortNewest(s.docs.map(Book.fromDoc));
       }),
       onError: (Object e) => setState(() => _error = e),
+    ));
+    _subs.add(LoanService.watchWaitsOnMyBooks(uid).listen(
+      (w) => setState(() => _waits = w),
+      onError: (_) {},
     ));
     _subs.add(LoanService.watchMine(uid).listen(
       (l) => setState(() => _loans = l.where((x) => x.ownerId == uid).toList()),
@@ -134,7 +139,12 @@ class _MyBookLoansScreenState extends State<MyBookLoansScreen> {
                 style: TextStyle(fontSize: 13, color: theme.colorScheme.outline),
               ),
             ),
-            for (final e in entries) _BookLoansCard(book: e.book, loans: e.loans),
+            for (final e in entries)
+              _BookLoansCard(
+                book: e.book,
+                loans: e.loans,
+                waits: _waits.where((w) => w.bookId == e.book.id).toList(),
+              ),
           ],
         ),
       ),
@@ -179,8 +189,10 @@ class _MyBookLoansScreenState extends State<MyBookLoansScreen> {
 class _BookLoansCard extends StatelessWidget {
   final Book book;
   final List<Loan> loans; // 이 책의 대여 건 전부 (정렬 전)
+  final List<WaitEntry> waits; // 이 책을 기다리는 사람들 (먼저 기다린 순)
 
-  const _BookLoansCard({required this.book, required this.loans});
+  const _BookLoansCard(
+      {required this.book, required this.loans, this.waits = const []});
 
   static String _day(DateTime? d) => d == null ? '' : '${d.month}/${d.day}';
 
@@ -271,6 +283,22 @@ class _BookLoansCard extends StatelessWidget {
               ),
             ),
           for (final l in active) _activeRow(context, l),
+          if (waits.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.hourglass_bottom, size: 18, color: cs.primary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                        '기다리는 사람 ${waits.length}명: ${waits.map((w) => w.userName).join(', ')}',
+                        style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant)),
+                  ),
+                ],
+              ),
+            ),
           if (past.isNotEmpty) ...[
             Padding(
               padding: const EdgeInsets.only(top: 10, bottom: 4),
@@ -309,8 +337,12 @@ class _BookLoansCard extends StatelessWidget {
         break;
       default: // lent
         icon = Icons.menu_book_outlined;
-        head = '${l.borrowerName}님이 읽는 중';
-        if (l.isOverdue) {
+        head = l.returnReported
+            ? '${l.borrowerName}님이 반납했다고 알렸어요'
+            : '${l.borrowerName}님이 읽는 중';
+        if (l.returnReported) {
+          lines.add('"대여" 탭에서 "돌려받았어요"를 눌러 확인해 주세요');
+        } else if (l.isOverdue) {
           final days = DateTime.now()
               .difference(DateTime.tryParse(l.dueDate) ?? DateTime.now())
               .inDays;

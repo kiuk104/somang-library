@@ -1,8 +1,61 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../app_theme.dart';
 import '../models/book.dart';
 import '../utils/web_platform.dart';
+
+/// 시트·대화상자(배경이 어두워지는 팝업)가 떠 있는 동안 뒤쪽 표지 이미지를 숨기는 장치.
+///
+/// 표지 서버가 CORS 를 안 열어 주면 표지가 <img> HTML 요소로 그려지는데(아래 webHtmlElementStrategy),
+/// 이 요소는 Flutter 화면 위에 따로 떠 있어서 시트가 뒤쪽 표지를 가려 주지 못하고
+/// 서가의 표지가 시트 버튼 위로 비쳐 보인다. 그래서 팝업이 떠 있는 동안에는
+/// 팝업 뒤의 표지를 빈 칸으로 바꾸고, 맨 위 팝업 안의 표지만 그린다.
+/// MaterialApp.navigatorObservers 에 [CoverOverlay.observer] 를 꼭 넣어야 한다.
+class CoverOverlay {
+  static final List<Route<dynamic>> _stack = [];
+  static final ValueNotifier<int> _tick = ValueNotifier(0);
+
+  static final NavigatorObserver observer = _CoverOverlayObserver();
+
+  /// 이 context 의 표지를 지금 그려도 되는지
+  static bool visibleFor(BuildContext context) {
+    if (_stack.isEmpty) return true;
+    final route = ModalRoute.of(context);
+    return route != null && identical(route, _stack.last);
+  }
+
+  static void _notify() {
+    // 네비게이터가 화면을 바꾸는 도중에 호출되므로 다음 순간에 알린다
+    scheduleMicrotask(() => _tick.value++);
+  }
+}
+
+class _CoverOverlayObserver extends NavigatorObserver {
+  /// 배경이 어두워지는 팝업(시트·대화상자)만 — 팝업 메뉴(barrierColor 없음)는 제외
+  bool _isScrimPopup(Route<dynamic> route) =>
+      route is PopupRoute && route.barrierColor != null;
+
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    if (!_isScrimPopup(route)) return;
+    CoverOverlay._stack.add(route);
+    CoverOverlay._notify();
+    // 닫히는 애니메이션이 다 끝난 뒤에 뒤쪽 표지를 되살린다
+    if (route is TransitionRoute) {
+      route.completed.whenComplete(() {
+        CoverOverlay._stack.remove(route);
+        CoverOverlay._notify();
+      });
+    }
+  }
+
+  @override
+  void didRemove(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    if (CoverOverlay._stack.remove(route)) CoverOverlay._notify();
+  }
+}
 
 /// 책 표지 — 표지 이미지가 없거나 못 불러오면 제목으로 만든 표지를 보여준다
 class BookCover extends StatelessWidget {
@@ -41,7 +94,22 @@ class BookCover extends StatelessWidget {
         height: height,
         child: coverUrl.isEmpty || WebPlatform.noCovers
             ? placeholder
-            : Image.network(
+            : ValueListenableBuilder<int>(
+                valueListenable: CoverOverlay._tick,
+                builder: (context, _, _) => !CoverOverlay.visibleFor(context)
+                    ? ColoredBox(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .surfaceContainerHighest)
+                    : _image(dpr, placeholder),
+              ),
+      ),
+    );
+  }
+
+  Widget _image(double dpr, Widget placeholder) {
+    final height = width * 1.5;
+    return Image.network(
                 coverUrl,
                 width: width,
                 height: height,
@@ -58,9 +126,7 @@ class BookCover extends StatelessWidget {
                         ? WebHtmlElementStrategy.prefer
                         : WebHtmlElementStrategy.fallback,
                 errorBuilder: (_, _, _) => placeholder,
-              ),
-      ),
-    );
+              );
   }
 }
 
